@@ -10,7 +10,6 @@ The pipeline adresses the following sub-tasks:
 In the options, `st3` models can be used to do either st1 or st2 tasks.
 However, when the model is called both tasks are done regardless if the pipeline requests for only one.
 
-
 ## Import the pretrained models
 
 Create and populate the `pretrained_models` folder.
@@ -28,16 +27,11 @@ pretrained_models:
     roberta_st2:
       pretrained_model_folder
   st3:
-    LLM_st3:
-      nothing so far
     rebel_st3:
       pretrained_model.pth
 ```
 
-The LLM_st3 options does not require anything for the moment. but it is still kept because a future LLM might need something stored in there.
-
 When adding new files into `st0` or `rebel_st3` be mindful of keeping the file as the same file type as shown in the example.
-
 
 TBW where to find these files
 
@@ -45,22 +39,35 @@ TBW where to find these files
 
 Build the docker image using
 
-    docker build -t kflow/rel_extraction .
-
+```cli
+docker build -f Dockerfile.api -t kflow/rel_extraction .
+```
 
 then run the image with
 
-    docker run -d -p 5002:5004 -v $(pwd)/pretrained_models:/pretrained_models -v $(pwd)/out:/out --name kflow_rel_extraction kflow/rel_extraction
+```cli
+docker run -d -p 5004:5004 -v $(pwd)/pretrained_models:/pretrained_models -v $(pwd)/out:/out --name kflow_rel_extraction kflow/rel_extraction
+```
 
 When running the link that is given in the terminal change the local port number to the number that you exported from your local machine.
 For the previous example it would be http://127.0.0.1:5004/swagger/
 > (Be sure to add the /swagger to the end of the link)
 
+For the demo, run
 
+```cli
+docker build -f Dockerfile.demo -t kflow/rel_extraction_demo .
+```
+
+then run the image with
+
+```cli
+docker run -d -p 5002:5004 -v $(pwd)/pretrained_models:/pretrained_models -v $(pwd)/out:/out --name kflow_rel_extraction kflow/rel_extraction
+```
 
 ## Running the pipeline manually
 
-There are two options for running the pipeline without the use of the web application: passing the arguements to call_pipeline.py, and creating a config file which is passed to call_pipeline.py
+There are two options for running the pipeline without the use of the web application: passing the arguments to call_pipeline.py, and creating a config file which is passed to call_pipeline.py
 
 Arguements available:
 

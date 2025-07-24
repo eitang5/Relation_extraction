@@ -1,6 +1,6 @@
 import os
-import re
 import yaml
+import configparser
 
 CACHE_DIR = 'out/'
 DEFAULT_PORT = 5004
@@ -8,6 +8,7 @@ SWAGGER_URL = '/swagger'
 SWAGGER_TEMPLATE = 'static/swagger-template.yaml'
 SWAGGER_OUT = 'static/swagger.yaml'  # URL for exposing Swagger file
 AVAILABLE_LLMS = ['zephyr', 'dpo', 'una', 'solar', 'gpt4']
+AVAILABLE_MODELS = {}
 DATA_PATH = 'new_data/'
 
 import werkzeug
@@ -16,7 +17,6 @@ from flask_restful import Api, Resource
 from flask_swagger_ui import get_swaggerui_blueprint
 
 from two_step_model import run_pipeline
-import configparser
 
 def model_names_in_dirs(directory_list):
     options = []
@@ -36,7 +36,18 @@ def model_names_in_dir(directory_path):
                     options.append(option)
     return options
 
-# Check the available models to offer them as options to users
+def populate_available_models():
+    AVAILABLE_MODELS['st0'] = model_names_in_dir('pretrained_models/st0')
+
+    AVAILABLE_MODELS['st1']= model_names_in_dirs(['pretrained_models/st1','pretrained_models/st3'])+ AVAILABLE_LLMS + ['off']
+
+    AVAILABLE_MODELS['st2']= model_names_in_dirs(['pretrained_models/st2','pretrained_models/st3'])+ AVAILABLE_LLMS + ['off']
+
+    AVAILABLE_MODELS['f'] = [filename
+            for filename in os.listdir(DATA_PATH) 
+            if os.path.isfile(os.path.join (DATA_PATH, filename))]
+
+# Populate options for users in the swagger config
 def set_choices(yaml_file):
     with open(SWAGGER_TEMPLATE, 'r') as stream:
         yconfig = yaml.load(stream, Loader=yaml.CLoader)
@@ -46,18 +57,14 @@ def set_choices(yaml_file):
     for x in parameters:
         params[x['name']] = x
     
-    params['st0']['enum'] = model_names_in_dir('pretrained_models/st0')
-    options = model_names_in_dirs(['pretrained_models/st1','pretrained_models/st3'])
-    params['st1']['enum'] = options + AVAILABLE_LLMS + ['off']
-    options = model_names_in_dirs(['pretrained_models/st2','pretrained_models/st3'])
-    params['st2']['enum'] = options + AVAILABLE_LLMS + ['off']
-    params['f']['enum'] = [filename for filename in os.listdir(DATA_PATH) 
-                       if os.path.isfile(os.path.join(DATA_PATH, filename))]
+    for x in ['st0','st1','st2', 'f']:
+        params[x]['enum'] = AVAILABLE_MODELS[x]
 
     print('Loading Swagger with the following configuration')
     print(yconfig)
     with open(SWAGGER_OUT, 'w') as file:
         yaml.dump(yconfig, file)
+    return yconfig
 
 # Collects all of the responses from the user and puts it into one dict
 def get_params():
@@ -297,6 +304,13 @@ class extract(Resource):
 
 api.add_resource(extract, '/extract')
 
+class models(Resource):
+    def get(self):
+        return jsonify(AVAILABLE_MODELS)
+
+api.add_resource(models, '/models')
+
+
 args_script1 = ['python', 'two_step_model.py']
 @app.route('/')
 def index():
@@ -308,5 +322,6 @@ def test_pipe():
     return json
 
 if __name__ == "__main__":
+    populate_available_models()
     set_choices(SWAGGER_OUT)
     app.run(port=DEFAULT_PORT, host='0.0.0.0', debug=True)

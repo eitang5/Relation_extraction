@@ -1,6 +1,6 @@
 info:
   description: Extract event relations from sentences
-  title: Relation Detection API
+  title: Event Relation Detection API
   version: 1.0.11
 openapi: 3.0.3
 paths:
@@ -150,3 +150,22 @@ paths:
                     type: string
                 type: object
           description: Bad request
+      summary: Perform event relation detection
+  /models:
+    get:
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                properties:
+                  f:
+                    type: array
+                  st0:
+                    type: array
+                  st1:
+                    type: array
+                  st2:
+                    type: array
+                type: array
+      summary: Return the list of available models for each sub-task

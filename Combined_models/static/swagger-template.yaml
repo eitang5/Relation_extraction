@@ -1,12 +1,12 @@
 openapi: 3.0.3
 info:
-  title: Relation Detection API
+  title: Event Relation Detection API
   description: Extract event relations from sentences
   version: 1.0.11
 paths:
   /extract:
     get:
-      # summary: Get items with individual choices
+      summary: Perform event relation detection
       parameters:
         - in: query
           name: st0
@@ -123,3 +123,47 @@ paths:
                 properties:
                   message:
                     type: string
+
+  /models:
+    get:
+      summary: Return the list of available models for each sub-task
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                properties:
+                  st0:
+                    type: array
+                  st1:
+                    type: array
+                  st2:
+                    type: array
+                  f:
+                    type: array
+              example:
+                f:
+                - test.csv
+                st0:
+                - roberta_st0_best_model_st1.pt
+                st1:
+                - roberta_st1_best_model
+                - rebel_st3_model_our_data_gpt_augmented.pth
+                - zephyr
+                - dpo
+                - una
+                - solar
+                - gpt4
+                - 'off'
+                st2:
+                - roberta_st2_epoch_9
+                - rebel_st3_model_our_data_gpt_augmented.pth
+                - zephyr
+                - dpo
+                - una
+                - solar
+                - gpt4
+                - 'off'
+
+

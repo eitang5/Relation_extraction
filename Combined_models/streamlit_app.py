@@ -1,121 +1,85 @@
 import os
 import re
+import requests
 import streamlit as st
-from call_pipeline import main_call
 from annotated_text import annotated_text # https://pypi.org/project/st-annotated-text/
 
-
+SERVER = 'http://localhost:5004'
 COLOR_MAP = {'cause':'#fea', 'enable':'#8ef', 'prevent':'#afa', 'intend':'#faf', 'invalid':'#faa'}
+PRESETS = ['', 
+        '[Wrong inferences example] Lalu , Rabri upbeat after success of shutdown 29th January 2010 01:40 PM An RJD activist wears a garland and crown made of vegetables and shouts slogans along with others during a protest against inflation in Patna . Protests were held across Andhra Pradesh criticising police action on Naidu and his supporters . Denied Aid , Dalit Boy tries to End Life. So we are asking people to come out because it may be the last time that we are going to have a peaceful and lawful protest in Hong Kong , ” said one of the organisers of the rally.  Mining for trouble Sino Gold Mining , which only last week announced a joint venture to expand exploration near its White Mountain Mine in Jilin province , had to halt operations yesterday as protesting farmers blocked the main access road .',
+        
+        '[Correct inferences example] At Balagangamanahalli panchayat in Dharmapuri , residents of Eechampatti village laid siege to the Nallampalli BDO s office in protest against non supply of water . 15th September 2015 05:49 AM THIRUVANANTHAPURAM : With the government appearing to be in no mood to meet the demand of the doctors of the health service , the Kerala Government Medical Officers Association spearheading the hunger strike in front of the state secretariat has called for intensifying the agitation in the coming days . Subcontractors  will  be offered a settlement and a swift transition to new management  is expected  to avert an exodus of skilled workers from Waertsilae Marines two big shipyards, government officials said. As part of the year-long partnership, Oral-B and Scientific American Custom Media are releasing a series of content, including educational resources from leading medical and dental researchers that will help readers better understand the connections between oral health and whole body health. NE Youth s Death Sparks Protest 01st February 2014 09:23 AM Nido Taniam , son of Arunachal Pradesh Congress legislator Nido Pavitra died on Thursday allegedly after being beaten up at a market area in Lajpar Nagar here .'
+        ]
 
-def app(model_raw_results):
+def app(available_models):
     # Title of the app
     st.set_page_config(page_title='Event Relation Extraction Demo')
     st.title("Event Relation Extraction Demo")
     # remove "Deploy button" - see https://discuss.streamlit.io/t/how-to-hide-or-remove-the-deploy-button-that-appears-at-the-top-right-corner-of-the-streamlit-app/55325
     st.markdown(r"""
     <style>
-    .stDeployButton {
+        .stDeployButton, .stAppDeployButton {
             visibility: hidden;
         }
     </style>
+    
+    <div>
+        Code, documentation and paper at: <a href="https://github.com/ANR-kFLOW/Relation_extraction">https://github.com/ANR-kFLOW/Relation_extraction</a>
+    </div>
+    <hr>
     """, unsafe_allow_html=True)
-    preset_choices = ['', 
-        '[Wrong inferences example] Lalu , Rabri upbeat after success of shutdown 29th January 2010 01:40 PM An RJD activist wears a garland and crown made of vegetables and shouts slogans along with others during a protest against inflation in Patna . Protests were held across Andhra Pradesh criticising police action on Naidu and his supporters . Denied Aid , Dalit Boy tries to End Life. So we are asking people to come out because it may be the last time that we are going to have a peaceful and lawful protest in Hong Kong , ” said one of the organisers of the rally.  Mining for trouble Sino Gold Mining , which only last week announced a joint venture to expand exploration near its White Mountain Mine in Jilin province , had to halt operations yesterday as protesting farmers blocked the main access road .',
-        
-        '[Correct inferences example] At Balagangamanahalli panchayat in Dharmapuri , residents of Eechampatti village laid siege to the Nallampalli BDO s office in protest against non supply of water . 15th September 2015 05:49 AM THIRUVANANTHAPURAM : With the government appearing to be in no mood to meet the demand of the doctors of the health service , the Kerala Government Medical Officers Association spearheading the hunger strike in front of the state secretariat has called for intensifying the agitation in the coming days . Subcontractors  will  be offered a settlement and a swift transition to new management  is expected  to avert an exodus of skilled workers from Waertsilae Marines two big shipyards, government officials said. As part of the year-long partnership, Oral-B and Scientific American Custom Media are releasing a series of content, including educational resources from leading medical and dental researchers that will help readers better understand the connections between oral health and whole body health. NE Youth s Death Sparks Protest 01st February 2014 09:23 AM Nido Taniam , son of Arunachal Pradesh Congress legislator Nido Pavitra died on Thursday allegedly after being beaten up at a market area in Lajpar Nagar here .'
-        ]
-    
-    st1_st3 = model_raw_results['st1'] + model_raw_results['st3']
-    st2_st3 = model_raw_results['st2'] + model_raw_results['st3']
-    
-    st0_models = []
-    for entry in model_raw_results['st0']:
-        name = entry.split('/')
-        type = name[-2]
-        st0_models.append(type + '/' + name[-1])
-    st1_models = []
-    for entry in model_raw_results['st1']:
-        name = entry.split('/')
-        type = name[-2]
-        st1_models.append(type + '/' + name[-1])
-    st2_models = []
-    for entry in model_raw_results['st2']:
-        name = entry.split('/')
-        type = name[-2]
-        st2_models.append(type + '/' + name[-1])
-    for entry in model_raw_results['st3']:
-        name = entry.split('/')
-        type = name[-2]
-        st1_models.append(type + '/' + name[-1])
-        st2_models.append(type + '/' + name[-1])
     
     # Dropdown menu
-    #data_options = model_raw_results['data']
-    #selected_data = st.selectbox("Choose a dataset:", data_names)
-    selected_st0 = st.selectbox("**Sentence Classification model** (filter out sentences with no event relations)", st0_models)
-    selected_st1 = st.selectbox("**Relation Classification model** between *cause*, *prevent*, *intend* and *enable*", st1_models)
-    selected_st2= st.selectbox("**Relation Extration model** (extract the word spans referring to events and relations)", st2_models)
+    selected_st0 = st.selectbox("**Sentence Classification model** (filter out sentences with no event relations)", available_models['st0'])
+    selected_st1 = st.selectbox("**Relation Classification model** between *cause*, *prevent*, *intend* and *enable*", available_models['st1'])
+    selected_st2= st.selectbox("**Relation Extration model** (extract the word spans referring to events and relations)", available_models['st2'])
     
-    user_text = st.selectbox("Text to analyse:", preset_choices, accept_new_options=True)
+    user_text = st.selectbox("Text to analyse:", PRESETS, accept_new_options=True)
     user_text = re.sub(r"^\[.+\]", '', user_text, 0).strip()
 
-    api = st.text_input("OpenAI API key (only if you are using GPT-4)")
+    llm_api = st.text_input("OpenAI API key (only if you are using GPT-4)")
     
     # Button to trigger the output
     if st.button("Submit"):
         fail_flag = False
         
-        filter_path = ''.join([s for s in model_raw_results['st0'] if selected_st0 in s])
-        st1_path = ''.join([s for s in st1_st3 if selected_st1 in s])
-        st2_path = ''.join([s for s in st2_st3 if selected_st2 in s])
-        llm_api = api
-        
-        call_raw_results = {}
-        #note you need to check if the user leaves the text field balnk
-        
-        call_raw_results['filter'] = filter_path
-        call_raw_results['st1'] = st1_path
-        call_raw_results['st2'] = st2_path
-        
-        call_raw_results['q'] = user_text
-        if not call_raw_results['q']:
+        params = {
+            'st0': selected_st0,
+            'st1': selected_st1,
+            'st2': selected_st2,
+            'q': user_text,
+            'api': llm_api
+        }
+
+        if not user_text:
             st.write('Please submit a sentence or select a preset text')
             fail_flag = True
-            
-        if not api:
-            call_raw_results['api'] = 'None'
-            if 'gpt4' in st1_path or 'gpt4' in st2_path:
-                st.write('You need an OpenAI key if you use GPT-4')
-                fail_flag = True
-        else:
-            call_raw_results['api'] = llm_api
+
+        if not llm_api and ('gpt4' in selected_st1 or 'gpt4' in selected_st2):
+            st.write('You need an OpenAI key if you use GPT-4')
+            fail_flag = True
             
         if fail_flag:
             return
         
-        result = main_call(call_raw_results, flag=True)
+        r = requests.get(SERVER+'/extract', params=params)
+        result = r.json()
+
         if len(result) == 0:
             st.write('No entity relation found')
         else:
-            flag, inf = annotate_inf(result)
-            if flag:
-                for i in inf:
-                    annotated_text(i)
-            else:
-                for i in inf:
-                    annotated_text(i)
+            for i in annotate_inf(result):
+                annotated_text(i)
 
 def annotate_inf(_raw_results):
     annotated_list = []
     test_list = []
     t_list = ['subj', 'obj']
     
-    use_annotate = False
-    
     if len(_raw_results) == 0:
         pass
     elif 'roberta' in _raw_results[0]['st2_model']:
-        print('use case not implemented')
         for row in _raw_results:
             text = row['span_pred']
             rel = row['label']
@@ -194,23 +158,8 @@ def annotate_inf(_raw_results):
                         temp_list.append(entry)
                 loop_list = temp_list
             annotated_list.append(loop_list)
-            use_annotate = True
-    return use_annotate, annotated_list
+    return annotated_list
                 
-def get_choices(directory_path):
-    model_raw_results = {}
-    
-    for filename in os.listdir(directory_path):
-        filepath = os.path.join(directory_path, filename)
-        model_list = []
-        for typename in os.listdir(filepath):
-            typepath = os.path.join(filepath, typename)
-            for modelname in os.listdir(typepath):
-                modelpath = os.path.join(typepath, modelname)
-                model_list.append(modelpath)
-        model_raw_results[filename] = model_list
-    return model_raw_results
-
 def annotate_sub(sent, obj, label, color):
     annotated_list = []
     if obj.lower() in sent.lower():
@@ -224,7 +173,6 @@ def annotate_sub(sent, obj, label, color):
         annotated_list.append(sent)
         return annotated_list
 
-
 def extract_substring(text, start_tag='<ARG1>', end_tag='</ARG1>'):
     start_index = text.find(start_tag) + len(start_tag)
     end_index = text.find(end_tag)
@@ -233,7 +181,6 @@ def extract_substring(text, start_tag='<ARG1>', end_tag='</ARG1>'):
         return None  # Tags not found
 
     return text[start_index:end_index]
-
 
 def remove_tags(text):
     
@@ -244,8 +191,6 @@ def remove_tags(text):
     cleaned_text = re.sub(r"</?[^>]+>", "", text)
     cleaned_text = re.sub('  ', ' ', cleaned_text)
     return cleaned_text
-
-
 
 def highlight_sent(sent, tag_order, tag_list):
     tag = tag_list[tag_order[1]]
@@ -289,7 +234,6 @@ def subsplit_text(part, color, s, tag):
         sub_list.append(part)
     return sub_list
 
-
 def extract_spans(sents):
     span_list = []
     
@@ -311,15 +255,8 @@ def extract_spans(sents):
     return span_list
 
 if __name__ == "__main__":
-    available_llms = [
-    "llm/zephyr",
-    "llm/dpo",
-    "llm/una",
-    "llm/solar",
-    "llm/gpt4"]
-    directory_path = 'pretrained_models/'
-    data_path = 'new_data/'
-    model_raw_results = get_choices(directory_path)
-    model_raw_results['st3'] += available_llms
-    app(model_raw_results)
+    SERVER = os.getenv('SERVER', SERVER)
+    r = requests.get(SERVER+'/models')
+    available_models = r.json()
+    app(available_models)
     
