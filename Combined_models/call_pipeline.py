@@ -1,7 +1,7 @@
 import argparse
 import configparser
 import os
-from two_step_model import run_pipeline
+from pipeline import run_pipeline
 import pandas as pd
 from datetime import datetime
 

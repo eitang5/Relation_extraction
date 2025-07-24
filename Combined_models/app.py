@@ -16,7 +16,7 @@ from flask import Flask, render_template, jsonify, request
 from flask_restful import Api, Resource
 from flask_swagger_ui import get_swaggerui_blueprint
 
-from two_step_model import run_pipeline
+from pipeline import run_pipeline
 
 def model_names_in_dirs(directory_list):
     options = []
@@ -79,7 +79,7 @@ def get_params():
     return response
 
 #this generates the preset labels for each of the subtasks
-#it is important to note that the preset may not exist but that is checked in two_step_model.py
+#it is important to note that the preset may not exist but that is checked in pipeline.py
 def check_cache(cache_list):
     skip_path = {}
     f = cache_list['f']
@@ -309,7 +309,7 @@ class models(Resource):
 api.add_resource(models, '/models')
 
 
-args_script1 = ['python', 'two_step_model.py']
+args_script1 = ['python', 'pipeline.py']
 @app.route('/')
 def index():
     return render_template('index.html')
