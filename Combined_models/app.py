@@ -301,13 +301,11 @@ class extract(Resource):
 
         json = run_pipeline(config)
         return jsonify(json)
-
 api.add_resource(extract, '/extract')
 
 class models(Resource):
     def get(self):
         return jsonify(AVAILABLE_MODELS)
-
 api.add_resource(models, '/models')
 
 
