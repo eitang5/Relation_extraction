@@ -9,7 +9,7 @@ SWAGGER_TEMPLATE = 'static/swagger-template.yaml'
 SWAGGER_OUT = 'static/swagger.yaml'  # URL for exposing Swagger file
 AVAILABLE_LLMS = ['zephyr', 'dpo', 'una', 'solar', 'gpt4']
 AVAILABLE_MODELS = {}
-DATA_PATH = 'new_data/'
+DATA_PATH = 'data/'
 
 import werkzeug
 from flask import Flask, render_template, jsonify, request
@@ -309,7 +309,6 @@ class models(Resource):
 api.add_resource(models, '/models')
 
 
-args_script1 = ['python', 'pipeline.py']
 @app.route('/')
 def index():
     return render_template('index.html')

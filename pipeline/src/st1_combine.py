@@ -189,7 +189,7 @@ def main_st1(args):
         print("MPS device not found")
 
     parser = HfArgumentParser((ModelArguments, DataTrainingArguments, TrainingArguments))
-    if args == None:
+    if args is None:
         if len(sys.argv) == 2 and sys.argv[1].endswith(".json"):
             # If we pass only one argument to the script and it's the path to a json file,
             # let's parse it to get our arguments.
@@ -351,7 +351,7 @@ def main_st1(args):
         use_auth_token=True if model_args.st1_use_auth_token else None,
     )
     # model = model.to(device=mps_device)
-    
+
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model = model.to(device)
     # Preprocessing the raw_datasets

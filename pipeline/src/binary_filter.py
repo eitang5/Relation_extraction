@@ -1,10 +1,11 @@
 import argparse
+
 import pandas as pd
 import torch
 import torch.nn as nn
 from torch.optim import AdamW
 from torch.utils.data import DataLoader, Dataset
-from transformers import RobertaTokenizer, RobertaForSequenceClassification, get_linear_schedule_with_warmup
+from transformers import RobertaTokenizer, RobertaForSequenceClassification
 
 
 # Define dataset class
@@ -39,17 +40,14 @@ class CustomDataset(Dataset):
             'label': torch.tensor(label, dtype=torch.long)
         }
 
+
 def run_filter(args):
-    
     test_data = args.base_df
     if 'num_rs' in test_data.columns:
         test_data.loc[test_data['num_rs'] > 1, 'num_rs'] = 1
-        
     else:
         test_data['num_rs'] = 0
         test_data.loc[1, 'num_rs'] = 1
-    
-
 
     print("Length of test_data:", len(test_data))
 
@@ -57,16 +55,13 @@ def run_filter(args):
 
     print("\nDistribution of num_rs column for test_data:")
     print(test_data['num_rs'].value_counts(normalize=True))
-    
+
     # Set device
-    
+
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    
-    cuda_flag = False
-    if torch.cuda.is_available():
-        cuda_flag = True
-    else:
-        cuda_flag = False
+
+    cuda_flag = torch.cuda.is_available()
+
     # Define parameters
     MAX_LEN = 128
     TRAIN_BATCH_SIZE = 32
@@ -76,9 +71,9 @@ def run_filter(args):
 
     # Initialize tokenizer and model
     tokenizer = RobertaTokenizer.from_pretrained('roberta-base', cache_dir='data/huggingface/')
-    model = RobertaForSequenceClassification.from_pretrained('roberta-base', num_labels=2, cache_dir='data/huggingface/')
+    model = RobertaForSequenceClassification.from_pretrained('roberta-base', num_labels=2,
+                                                             cache_dir='data/huggingface/')
     model.to(device)
-
 
     # Define optimizer and scheduler
     optimizer = AdamW(model.parameters(), lr=LEARNING_RATE)
@@ -86,18 +81,18 @@ def run_filter(args):
     # Define loss function
     loss_fn = nn.CrossEntropyLoss()
     best_f1_score = 0.0
-    #best_model_path = "best_model_st1.pt"
+    # best_model_path = "best_model_st1.pt"
     best_model_path = args.filter_model_path
-    #print(best_model_path)
-
+    # print(best_model_path)
 
     # Test loop
     test_dataset = CustomDataset(test_data['text'], test_data['num_rs'], tokenizer, MAX_LEN)
     test_loader = DataLoader(test_dataset, batch_size=VALID_BATCH_SIZE, shuffle=False)
 
     # Load the best model
-    best_model = RobertaForSequenceClassification.from_pretrained('roberta-base', num_labels=2, cache_dir='data/huggingface/')
-    if cuda_flag == True:
+    best_model = RobertaForSequenceClassification.from_pretrained('roberta-base', num_labels=2,
+                                                                  cache_dir='data/huggingface/')
+    if cuda_flag:
         best_model.load_state_dict(torch.load(best_model_path))
     else:
         best_model.load_state_dict(torch.load(best_model_path, map_location=torch.device('cpu')))
@@ -119,21 +114,21 @@ def run_filter(args):
             predicted = (probs > args.filter_threshold).long()  # Apply threshold
             test_predictions.extend(predicted.cpu().numpy())
             test_true_labels.extend(labels.cpu().numpy())
-            
-    # Calculate test accuracy and classification report
-    #test_accuracy = accuracy_score(test_true_labels, test_predictions)
-    #test_classification_report = classification_report(test_true_labels, test_predictions)
 
-    #print(f"Best Model - Test Accuracy: {test_accuracy:.4f}")
-    #print("Best Model - Test Classification Report:")
-    #print(test_classification_report)
+    # Calculate test accuracy and classification report
+    # test_accuracy = accuracy_score(test_true_labels, test_predictions)
+    # test_classification_report = classification_report(test_true_labels, test_predictions)
+
+    # print(f"Best Model - Test Accuracy: {test_accuracy:.4f}")
+    # print("Best Model - Test Classification Report:")
+    # print(test_classification_report)
     t_data = test_data
     predicted_df = test_data
     predicted_df['num_rs'] = test_predictions
     predicted_df.loc[predicted_df['num_rs'] < 1, 'causal_text_w_pairs'] = '[]'
 
     condition = (predicted_df['num_rs'] > 0) & (t_data['num_rs'] > 0)
-    #print(t_data['num_rs'].head(20))
+    # print(t_data['num_rs'].head(20))
     predicted_df.loc[condition, 'num_rs'] = t_data.loc[condition, 'num_rs'].values
     predicted_df['label'] = 0
     predicted_df.loc[1, 'label'] = 1
@@ -143,12 +138,10 @@ def run_filter(args):
     predicted_df['triplets'] = s
     predicted_df.to_csv('causal_outs/predicted_as_causal.csv', index=False)
     predicted_df.loc[predicted_df['num_rs'] > 0].to_csv('causal_outs/only_causal.csv', index=False)
-    c =  predicted_df.loc[predicted_df['num_rs'] > 0]
+    c = predicted_df.loc[predicted_df['num_rs'] > 0]
     predicted_df.loc[predicted_df['num_rs'] == 1].to_csv('causal_outs/only_causal_single.csv', index=False)
     c = c.reset_index(drop=True)
     return c
-
-
 
 
 if __name__ == '__main__':
@@ -159,7 +152,7 @@ if __name__ == '__main__':
     parser.add_argument('--test_file', type=str, help='Path to the test data file')
     parser.add_argument('--filter_threshold', type=float, required=True, help='Threshold for classification')
     parser.add_argument('--filter_model_path', type=str, help='Path to model')
-    args , unknown = parser.parse_known_args()
+    args, unknown = parser.parse_known_args()
 
     # Load the dataset
 
@@ -167,11 +160,10 @@ if __name__ == '__main__':
 
     if 'num_rs' in test_data.columns:
         test_data.loc[test_data['num_rs'] > 1, 'num_rs'] = 1
-        
+
     else:
         test_data['num_rs'] = 0
         test_data.loc[1, 'num_rs'] = 1
-
 
     print("Length of test_data:", len(test_data))
 
@@ -183,11 +175,7 @@ if __name__ == '__main__':
     # Set device
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-    cuda_flag = False
-    if torch.cuda.is_available():
-        cuda_flag = True
-    else:
-        cuda_flag = False
+    cuda_flag = torch.cuda.is_available()
     # Define parameters
     MAX_LEN = 128
     TRAIN_BATCH_SIZE = 32
@@ -200,25 +188,24 @@ if __name__ == '__main__':
     model = RobertaForSequenceClassification.from_pretrained('roberta-base', num_labels=2)
     model.to(device)
 
-
     # Define optimizer and scheduler
     optimizer = AdamW(model.parameters(), lr=LEARNING_RATE)
 
     # Define loss function
     loss_fn = nn.CrossEntropyLoss()
     best_f1_score = 0.0
-    #best_model_path = "best_model_st1.pt"
+    # best_model_path = "best_model_st1.pt"
     best_model_path = args.filter_model_path
-
 
     # Test loop
     test_dataset = CustomDataset(test_data['text'], test_data['num_rs'], tokenizer, MAX_LEN)
     test_loader = DataLoader(test_dataset, batch_size=VALID_BATCH_SIZE, shuffle=False)
 
     # Load the best model
-    best_model = RobertaForSequenceClassification.from_pretrained('roberta-base', num_labels=2, cache_dir='data/huggingface/')
-    
-    if cuda_flag == True:
+    best_model = RobertaForSequenceClassification.from_pretrained('roberta-base', num_labels=2,
+                                                                  cache_dir='data/huggingface/')
+
+    if cuda_flag:
         best_model.load_state_dict(torch.load(best_model_path))
     else:
         best_model.load_state_dict(torch.load(best_model_path, map_location=torch.device('cpu')))
@@ -240,21 +227,20 @@ if __name__ == '__main__':
             predicted = (probs > args.filter_threshold).long()  # Apply threshold
             test_predictions.extend(predicted.cpu().numpy())
             test_true_labels.extend(labels.cpu().numpy())
-            
-    # Calculate test accuracy and classification report
-    #test_accuracy = accuracy_score(test_true_labels, test_predictions)
-    #test_classification_report = classification_report(test_true_labels, test_predictions)
 
-    #print(f"Best Model - Test Accuracy: {test_accuracy:.4f}")
-    #print("Best Model - Test Classification Report:")
-    #print(test_classification_report)
+    # Calculate test accuracy and classification report
+    # test_accuracy = accuracy_score(test_true_labels, test_predictions)
+    # test_classification_report = classification_report(test_true_labels, test_predictions)
+
+    # print(f"Best Model - Test Accuracy: {test_accuracy:.4f}")
+    # print("Best Model - Test Classification Report:")
+    # print(test_classification_report)
     t_data = pd.read_csv(args.test_file)
     predicted_df = test_data
     predicted_df['num_rs'] = test_predictions
     predicted_df.loc[predicted_df['num_rs'] < 1, 'causal_text_w_pairs'] = '[]'
 
     condition = (predicted_df['num_rs'] > 0) & (t_data['num_rs'] > 0)
-    #print(t_data['num_rs'].head(20))
     predicted_df.loc[condition, 'num_rs'] = t_data.loc[condition, 'num_rs'].values
     predicted_df['label'] = 0
     predicted_df.loc[1, 'label'] = 1
@@ -265,4 +251,3 @@ if __name__ == '__main__':
     predicted_df.to_csv('causal_outs/predicted_as_causal.csv', index=False)
     predicted_df.loc[predicted_df['num_rs'] > 0].to_csv('causal_outs/only_causal.csv', index=False)
     predicted_df.loc[predicted_df['num_rs'] == 1].to_csv('causal_outs/only_causal_single.csv', index=False)
-

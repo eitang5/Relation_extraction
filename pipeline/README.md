@@ -1,11 +1,11 @@
-## Sub-task list
+# Pipeline and Demo
 
-The pipeline adresses the following sub-tasks:
+The pipeline addresses the following sub-tasks:
 
 - `st0` filters out the entries that have no relationship
 - `st1` classifies the type of relationship in a given entry among `cause`, `enable`, `intend`, or `prevent`
 - `st2` identify the subject and the object of a given relationship for each entry
-- `st3` these models output a combination of `st1` and `st2`
+- `st3` these models output a combination of `st1` and `st2` (kept for legacy)
 
 In the options, `st3` models can be used to do either st1 or st2 tasks.
 However, when the model is called both tasks are done regardless if the pipeline requests for only one.
@@ -69,49 +69,35 @@ docker run -d -p 5002:5004 --name kflow_demo kflow/rel_extraction_demo
 
 There are two options for running the pipeline without the use of the web application: passing the arguments to call_pipeline.py, and creating a config file which is passed to call_pipeline.py
 
-Arguements available:
+Arguments available:
 
-  Input the path to the file you want to use for inferences
-  
-    --test_file
+- `--test_file`   Input the path to the file you want to use for inferences
     
-  Input the path to the pretrained model you are using for st1. Be sure to include the path in the pretrained models folder
-  
-    --st1_mod
+- `--st1_mod`   Input the path to the pretrained model you are using for st1. Be sure to include the path in the pretrained models folder
     
-  Input the path to the pretrained model you are using for st2.  
-    
-    --st2_mod
+- `--st2_mod`   Input the path to the pretrained model you are using for st2.  
 
-  If there is a config file available input the path and that will be taken as a priority over the other inputs. 
-    
-    --config_path
+- `--config_path`   If there is a config file available input the path and that will be taken as a priority over the other inputs. 
   
-  Type out your sentences in quote marks and be sure to seperate them with periods. This will be used instead of the test file
-    
-    --text_from_user
+- `--text_from_user`   Type out your sentences in quote marks and be sure to separate them with periods. This will be used instead of the test file
   
-  Type in true if you do not want the pipeline to perform st1
-    
-    --skip_st1
+- `--skip_st1`   Type in true if you do not want the pipeline to perform st1
   
-  Type in true if you do not want the pipeline to perform st2
-    
-    --skip_st2
+- `--skip_st2`   Type in true if you do not want the pipeline to perform st2
   
 Any value that is not specified will be filled in by the default value that is described in config_default.cfg this means that the pipeline can be ran with a command as simple as:
 
-    python call_pipeline.py
+    python pypeline.simplified.py
     
 Arguements can be added at the end to change the configuration of the pipeline, like:
 
-    python call_pipeline.py --text_from_user "This is a test sentence."
+    python pypeline.simplified.py --text_from_user "This is a test sentence."
 
 Which would make the pipeline use the given sentence instead of the default csv file
 
 When using a config file do a command like:
 
-    python call_pipeline.py --config_file /path/to/file
+    python pypeline.simplified.py --config_file /path/to/file
 
 For the config file the format looks like: 
 
@@ -121,11 +107,15 @@ For the config file the format looks like:
       
 A full example of this can be found in example.cfg
 
-Inputting arguements through a config file works the same way as typing it out in a command line.
+Inputting arguments through a config file works the same way as typing it out in a command line.
 
-    
+---
 
+## Citation
 
+If you use this software, please cite ([bib file](https://hal.science/hal-05135516v1/bibtex)):
 
-
-
+Gustavo Flores Miguel, Youssra Rebboud, Pasquale Lisena, Raphäel Troncy.
+**Streamlining Event Relation Extraction: A Pipeline Leveraging Pretrained and Large Language Models for Inference.**
+In: *EKAW 2024, 24th International Conference on Knowledge Engineering and Knowledge Management*, Poster and Demo Track, CEUR, Nov 2024, Amsterdam, Netherlands.
+https://ceur-ws.org/Vol-3967/PD_paper_184.pdf

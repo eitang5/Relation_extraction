@@ -1,9 +1,9 @@
 .DS_Store
 .vscode/
 
-Combined_models/out
-Combined_models/data
-Combined_models/pretrained_models
+pipeline/out
+pipeline/data
+pipeline/pretrained_models
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

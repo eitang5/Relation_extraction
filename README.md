@@ -6,6 +6,11 @@ This repository contains the data and scripts used for refined causality extract
 ## Data
 The `data` directory contains the datasets used in our experiments.
 
+## Pipeline
+
+In this directory, it is contained the pipeline, the API and the demo.
+Please refer to the README inside the folder.
+
 ## End-to-End Models
 The `end_to_end_models` directory includes models used for training, specifically:
 - **REBEL**

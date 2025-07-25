@@ -157,6 +157,29 @@ paths:
         '200':
           content:
             application/json:
+              example:
+                f:
+                - test.csv
+                st0:
+                - roberta_st0_best_model_st1.pt
+                st1:
+                - roberta_st1_best_model
+                - rebel_st3_model_our_data_gpt_augmented.pth
+                - zephyr
+                - dpo
+                - una
+                - solar
+                - gpt4
+                - 'off'
+                st2:
+                - roberta_st2_epoch_9
+                - rebel_st3_model_our_data_gpt_augmented.pth
+                - zephyr
+                - dpo
+                - una
+                - solar
+                - gpt4
+                - 'off'
               schema:
                 properties:
                   f:

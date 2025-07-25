@@ -37,7 +37,7 @@ from datetime import datetime
 
 import datasets
 import torch
-from datasets import  load_dataset, concatenate_datasets, Dataset, DatasetDict
+from datasets import load_dataset, concatenate_datasets, Dataset, DatasetDict
 from torch.utils.data import DataLoader
 from tqdm.auto import tqdm
 import pandas as pd
@@ -45,7 +45,6 @@ import pandas as pd
 import transformers
 from accelerate import Accelerator
 from accelerate.logging import get_logger
-# from accelerate.utils import set_seed
 from huggingface_hub import Repository
 from transformers import (
     CONFIG_MAPPING,
@@ -57,13 +56,12 @@ from transformers import (
     get_scheduler,
 )
 from transformers.tokenization_utils_base import PreTrainedTokenizerBase
-from transformers.utils import PaddingStrategy 
-from evaluation.subtask2.utils_eval_st2 import main as eval_st2
-from src.models.modeling_st2 import ST2ModelV2, SignalDetector
+from transformers.utils import PaddingStrategy
+from .evaluation.subtask2.utils_eval_st2 import main as eval_st2
+from .models.modeling_st2 import ST2ModelV2, SignalDetector
 
 import wandb
 import numpy as np
-
 
 logger = get_logger(__name__)
 # require_version("datasets>=1.8.0", "To fix: pip install -r examples/pytorch/token-classification/requirements.txt")
@@ -79,14 +77,14 @@ def set_seed(seed=1029):
     np.random.seed(seed)
     torch.manual_seed(seed)
     torch.cuda.manual_seed(seed)
-    torch.cuda.manual_seed_all(seed) # if you are using multi-GPU.
+    torch.cuda.manual_seed_all(seed)  # if you are using multi-GPU.
     torch.backends.cudnn.benchmark = False
     torch.backends.cudnn.deterministic = True
     torch.backends.cudnn.enabled = False
 
 
 def merge_multi_spaces(sent):
-    return re.sub(' +',' ',sent)
+    return re.sub(' +', ' ', sent)
 
 
 class DataCollatorMixin:
@@ -120,21 +118,21 @@ def parse_args():
         help="The configuration name of the dataset to use (via the datasets library).",
     )
     parser.add_argument(
-        "--st2_train_file", 
-        type=str, 
-        default=None, 
+        "--st2_train_file",
+        type=str,
+        default=None,
         help="A csv or a json file containing the training data."
     )
     parser.add_argument(
-        "--st2_validation_file", 
-        type=str, 
-        default=None, 
+        "--st2_validation_file",
+        type=str,
+        default=None,
         help="A csv or a json file containing the validation data."
     )
     parser.add_argument(
-        "--st2_test_file", 
-        type=str, 
-        default=None, 
+        "--st2_test_file",
+        type=str,
+        default=None,
         help="A csv or a json file containing the test data."
     )
     parser.add_argument(
@@ -221,15 +219,15 @@ def parse_args():
         help="Initial learning rate (after the potential warmup period) to use.",
     )
     parser.add_argument(
-        "--st2_weight_decay", 
-        type=float, 
-        default=0.0, 
+        "--st2_weight_decay",
+        type=float,
+        default=0.0,
         help="Weight decay to use."
     )
     parser.add_argument(
-        "--st2_num_train_epochs", 
-        type=int, 
-        default=3, 
+        "--st2_num_train_epochs",
+        type=int,
+        default=3,
         help="Total number of training epochs to perform."
     )
     parser.add_argument(
@@ -255,15 +253,15 @@ def parse_args():
         "--st2_num_warmup_steps", type=int, default=0, help="Number of steps for the warmup in the lr scheduler."
     )
     parser.add_argument(
-        "--st2_output_dir", 
-        type=str, 
-        default=None, 
+        "--st2_output_dir",
+        type=str,
+        default=None,
         help="Where to store the final model."
     )
     parser.add_argument(
-        "--st2_seed", 
-        type=int, 
-        default=42, 
+        "--st2_seed",
+        type=int,
+        default=42,
         help="A seed for reproducible training."
     )
     parser.add_argument(
@@ -296,18 +294,18 @@ def parse_args():
         help="Activate debug mode and run training only with a subset of data.",
     )
     parser.add_argument(
-        "--st2_push_to_hub", 
-        action="store_true", 
+        "--st2_push_to_hub",
+        action="store_true",
         help="Whether or not to push the model to the Hub."
     )
     parser.add_argument(
-        "--st2_hub_model_id", 
-        type=str, 
+        "--st2_hub_model_id",
+        type=str,
         help="The name of the repository to keep in sync with the local `output_dir`."
     )
     parser.add_argument(
-        "--st2_hub_token", 
-        type=str, 
+        "--st2_hub_token",
+        type=str,
         help="The token to use to push to the Model Hub."
     )
     parser.add_argument(
@@ -373,7 +371,7 @@ def parse_args():
         action="store_true",
         help="Whether to use pretrained signal detector",
     )
-    parser.add_argument( #"outs_test/signal_cls"
+    parser.add_argument(  # "outs_test/signal_cls"
         "--st2_signal_model_and_tokenizer_path",
         type=str,
         help="Path to pretrained signal detector model.",
@@ -422,10 +420,10 @@ def parse_args():
         default=5,
         help="Whether to use pretrained signal detector",
     )
-    args , unknown = parser.parse_known_args()
+    args, unknown = parser.parse_known_args()
 
     # Sanity checks
-    if args.st2_task_name is None and args.st2_train_file is None and args.st2_validation_file is None  and args.st2_test_file is None:
+    if args.st2_task_name is None and args.st2_train_file is None and args.st2_validation_file is None and args.st2_test_file is None:
         raise ValueError("Need either a task name or a training/validation file.")
     else:
         if args.st2_train_file is not None:
@@ -446,7 +444,7 @@ def parse_args():
 
 def clean_tok(tok):
     # Remove all other tags: E.g. <SIG0>, <SIG1>...
-    return re.sub('</*[A-Z]+\d*>','',tok) 
+    return re.sub('</*[A-Z]+\d*>', '', tok)
 
 
 def get_CE_bounds(text_w_pairs):
@@ -458,19 +456,19 @@ def get_CE_bounds(text_w_pairs):
 
         # Replace if special
         if '<ARG0>' in tok:
-            tok = re.sub('<ARG0>','',tok)
+            tok = re.sub('<ARG0>', '', tok)
             cause.append(i)
         if '</ARG0>' in tok:
-            tok = re.sub('</ARG0>','',tok)
+            tok = re.sub('</ARG0>', '', tok)
             cause.append(i)
         if '<ARG1>' in tok:
-            tok = re.sub('<ARG1>','',tok)
+            tok = re.sub('<ARG1>', '', tok)
             effect.append(i)
         if '</ARG1>' in tok:
-            tok = re.sub('</ARG1>','',tok)
+            tok = re.sub('</ARG1>', '', tok)
             effect.append(i)
         tokens.append(clean_tok(tok))
-    
+
     start_positions = [cause[0], effect[0]]
     end_positions = [cause[1], effect[1]]
 
@@ -481,24 +479,24 @@ def get_S_bounds(text_w_pairs):
     tokens = []
     start_positions = []
     end_positions = []
-    
+
     next_tag = tag = 'O'
     for i, tok in enumerate(text_w_pairs.split(' ')):
         # Replace if special
         if '<SIG' in tok:
-            tok = re.sub('<SIG([A-Z]|\d)*>','',tok)
+            tok = re.sub('<SIG([A-Z]|\d)*>', '', tok)
             start_positions.append(i)
-            
-            if '</SIG' in tok: # one word only
-                tok = re.sub('</SIG([A-Z]|\d)*>','',tok)
+
+            if '</SIG' in tok:  # one word only
+                tok = re.sub('</SIG([A-Z]|\d)*>', '', tok)
                 end_positions.append(i)
 
         elif '</SIG' in tok:
-            tok = re.sub('</SIG([A-Z]|\d)*>','',tok)
+            tok = re.sub('</SIG([A-Z]|\d)*>', '', tok)
             end_positions.append(i)
 
         tokens.append(clean_tok(tok))
-    
+
     # workaround for errors where there are no closing bounds for SIG
     min_len = min(len(start_positions), len(end_positions))
 
@@ -508,10 +506,10 @@ def get_S_bounds(text_w_pairs):
 def get_CES_bounds(text_w_pairs):
     tokens, starts, ends = get_CE_bounds(text_w_pairs)
     tokens_s, starts_s, ends_s = get_S_bounds(text_w_pairs)
-    assert(tokens==tokens_s)
-    assert(len(starts)==len(ends))
-    assert(len(starts_s)==len(ends_s))
-    return tokens, starts+starts_s, ends+ends_s
+    assert (tokens == tokens_s)
+    assert (len(starts) == len(ends))
+    assert (len(starts_s) == len(ends_s))
+    return tokens, starts + starts_s, ends + ends_s
 
 
 def main_st2(arg):
@@ -519,9 +517,10 @@ def main_st2(arg):
         args = arg
     else:
         args = parse_args()
-            
+
     accelerator = (
-        Accelerator(log_with=args.st2_report_to, logging_dir=args.st2_output_dir) if args.st2_with_tracking else Accelerator()
+        Accelerator(log_with=args.st2_report_to,
+                    logging_dir=args.st2_output_dir) if args.st2_with_tracking else Accelerator()
     )
     # Make one log on every process with the configuration for debugging.
     logging.basicConfig(
@@ -531,7 +530,7 @@ def main_st2(arg):
     )
     logger.info(accelerator.state, main_process_only=False)
     if args.st2_with_tracking:
-        
+
         wandb.init(config=args)
         wandb.run.log_code(".")
     else:
@@ -587,13 +586,12 @@ def main_st2(arg):
             data_files["train"] = args.st2_train_file
             extension = args.st2_train_file.split(".")[-1]
         if args.st2_validation_file is not None:
-            
             data_files["validation"] = args.st2_validation_file
             extension = args.st2_validation_file.split(".")[-1]
         if args.st2_test_file is not None:
             data_files["test"] = args.st2_test_file
             extension = args.st2_test_file.split(".")[-1]
-        #raw_datasets = load_dataset(extension, data_files=data_files)
+        # raw_datasets = load_dataset(extension, data_files=data_files)
         dataset = Dataset.from_pandas(args.only_causal)
         raw_datasets = DatasetDict({"test": dataset})
     # Trim a number of training examples
@@ -607,7 +605,7 @@ def main_st2(arg):
     ce_label_list = ['O', 'B-C', 'I-C', 'B-E', 'I-E']
     ce_label_to_id = {l: i for i, l in enumerate(ce_label_list)}
     ce_id_to_label = {i: l for i, l in enumerate(ce_label_list)}
-    
+
     sig_label_list = ['O', 'B-S', 'I-S']
     sig_label_to_id = {l: i for i, l in enumerate(sig_label_list)}
     sig_id_to_label = {i: l for i, l in enumerate(sig_label_list)}
@@ -631,10 +629,12 @@ def main_st2(arg):
         )
 
     if config.model_type in {"gpt2", "roberta"}:
-        tokenizer = AutoTokenizer.from_pretrained(tokenizer_name_or_path, use_fast=True, add_prefix_space=True, cache_dir='data/huggingface/')
+        tokenizer = AutoTokenizer.from_pretrained(tokenizer_name_or_path, use_fast=True, add_prefix_space=True,
+                                                  cache_dir='data/huggingface/')
     else:
         tokenizer = AutoTokenizer.from_pretrained(tokenizer_name_or_path, use_fast=True, cache_dir='data/huggingface/')
-    tokenizer.add_special_tokens({"additional_special_tokens": ["<ARG0>", "</ARG0>", "<ARG1>", "</ARG1>", "<SIG0>", "</SIG0>"]})
+    tokenizer.add_special_tokens(
+        {"additional_special_tokens": ["<ARG0>", "</ARG0>", "<ARG1>", "</ARG1>", "<SIG0>", "</SIG0>"]})
 
     model = ST2ModelV2(args)
     ce_b_to_i_label = []
@@ -651,7 +651,6 @@ def main_st2(arg):
         else:
             sig_b_to_i_label.append(idx)
 
-
     def preprocessing(examples):
         all_tokens = []
         all_starts = []
@@ -664,29 +663,29 @@ def main_st2(arg):
                     all_tokens.append(tokens)
                     all_starts.append(starts)
                     all_ends.append(ends)
-        assert(len(all_tokens)==len(all_starts))
-        assert(len(all_ends)==len(all_starts))
+        assert (len(all_tokens) == len(all_starts))
+        assert (len(all_ends) == len(all_starts))
         return {"tokens": all_tokens, "all_starts": all_starts, "all_ends": all_ends}
 
-    
     if args.st2_train_file is not None:
         raw_datasets['train'] = raw_datasets['train'].map(
-            preprocessing, 
-            batched=True, 
+            preprocessing,
+            batched=True,
             remove_columns=raw_datasets['train'].column_names
-            )
-    
+        )
+
     if args.st2_augmentation_file is not None and args.st2_train_file is not None:
         augment_dataset = augment_dataset.map(
-            preprocessing, 
-            batched=True, 
+            preprocessing,
+            batched=True,
             remove_columns=augment_dataset.column_names
-            )
+        )
         raw_datasets['train'] = concatenate_datasets([raw_datasets['train'], augment_dataset])
 
     # Preprocessing the datasets.
     # First we tokenize all the texts.
     padding = "max_length" if args.st2_pad_to_max_length else False
+
     # Tokenize all texts and align the labels with them.
     def tokenize_and_align_labels(examples):
         tokenized_inputs = tokenizer(
@@ -697,22 +696,19 @@ def main_st2(arg):
             # We use this argument because the texts in our dataset are lists of words (with a label for each word).
             is_split_into_words=True,
         )
-        
+
         # convert word to token tags
         converted_starts = []
         converted_ends = []
         store_word_ids = []
         for i, tokens in enumerate(examples['tokens']):
 
-
-            
-        
             word_ids = tokenized_inputs.word_ids(batch_index=i)
-            word2tok = {w:[] for w in range(len(tokens))}
+            word2tok = {w: [] for w in range(len(tokens))}
             for token_idx, word_idx in enumerate(word_ids):
                 if word_idx is not None:
                     word2tok[word_idx].append(token_idx)
-            
+
             starts = []
             ends = []
 
@@ -727,39 +723,37 @@ def main_st2(arg):
                     # print('yes')
                     word2tok[first_key] = [0]
 
-
             for a in examples['all_starts'][i]:
                 # sometimes, word2tok can be like
                 # {0: [1, 2], 1: [3], 2: [4], 3: [5, 6], 4: [7], 5: [8], 6: [9], 7: [10], 8: [], 9: [11, 12], 10: [], 11: [13], 12: [14], 13: [15], 14: [16, 17]}
                 # i.e. word --st2_> empty token ids
                 # if so, we move to earlier word for starts
-                while (len(word2tok[int(a)])==0) and a>=0:
-                    a-=1
+                while (len(word2tok[int(a)]) == 0) and a >= 0:
+                    a -= 1
                 starts.append(word2tok[int(a)][0])
             for a in examples['all_ends'][i]:
 
-               
                 while (a >= 0) and (len(word2tok[int(a)]) == 0) and (a < len(word2tok)):
-                    a+=1
+                    a += 1
                 ends.append(word2tok[int(a)][-1])
             starts = starts[:3]
             ends = ends[:3]
 
             # our code only predicts 1 signal for now
-            if len(starts)<=2 and len(ends)<=2:
+            if len(starts) <= 2 and len(ends) <= 2:
                 # if missing signal, we put a dummy to ignore
                 starts.append(-100)
                 ends.append(-100)
-            
+
             converted_starts.append(starts)
             converted_ends.append(ends)
             store_word_ids.append(word_ids)
-        
+
         # tokenized_inputs["tokens"] = examples['tokens']
         tokenized_inputs["start_positions"] = converted_starts
         tokenized_inputs["end_positions"] = converted_ends
         # tokenized_inputs["store_word_ids"] = store_word_ids
-        
+
         return tokenized_inputs
 
     def tokenize(examples):
@@ -778,8 +772,8 @@ def main_st2(arg):
                 signal_bias_mask = [0] * len(input_id)
                 for j, phrase_id in enumerate(signal_phrases_ids):
                     for k in range(len(input_id)):
-                        if input_id[k:k+len(phrase_id)] == phrase_id:
-                            signal_bias_mask[k:k+len(phrase_id)] = [1] * len(phrase_id)
+                        if input_id[k:k + len(phrase_id)] == phrase_id:
+                            signal_bias_mask[k:k + len(phrase_id)] = [1] * len(phrase_id)
                 all_signal_bias_mask.append(signal_bias_mask)
             tokenized_inputs["signal_bias_mask"] = all_signal_bias_mask
 
@@ -800,7 +794,7 @@ def main_st2(arg):
                 train_dataset = train_dataset.select(range(args.st2_max_train_samples))
     else:
         train_dataset = None
-    
+
     if args.st2_validation_file is not None:
         truth = pd.read_csv(args.st2_validation_file, sep=",", encoding="utf-8").reset_index(drop=True)
         with accelerator.main_process_first():
@@ -809,15 +803,15 @@ def main_st2(arg):
                 batched=True,
                 remove_columns=raw_datasets["validation"].column_names,
                 desc="Running tokenizer on dataset",
-                load_from_cache_file=False,      
+                load_from_cache_file=False,
             )
-            
+
             if args.st2_max_eval_samples is not None:
                 truth = truth.iloc[:args.st2_max_eval_samples]
                 eval_dataset = eval_dataset.select(range(args.st2_max_eval_samples))
     else:
         eval_dataset = None
-    
+
     if args.st2_test_file is not None:
         with accelerator.main_process_first():
             test_dataset = raw_datasets["test"].map(
@@ -825,7 +819,7 @@ def main_st2(arg):
                 batched=True,
                 remove_columns=raw_datasets["test"].column_names,
                 desc="Running tokenizer on dataset",
-                load_from_cache_file=False,      
+                load_from_cache_file=False,
             )
             if args.st2_max_test_samples is not None:
                 test_dataset = test_dataset.select(range(args.st2_max_test_samples))
@@ -898,7 +892,6 @@ def main_st2(arg):
                     start_positions = [feature["start_positions"] for feature in features]
                     end_positions = [feature["end_positions"] for feature in features]
 
-
                 word_ids = None
                 if "word_ids" in features[0]:
                     word_ids = [features[i].pop("word_ids") for i, feature in enumerate(features)]
@@ -923,14 +916,15 @@ def main_st2(arg):
                 # pad signal_bias_mask to max_length
                 if args.st2_add_signal_bias:
                     for i, signal_bias_mask in enumerate(batch['signal_bias_mask']):
-                        batch['signal_bias_mask'][i] = signal_bias_mask + [0] * (sequence_length - len(signal_bias_mask))
+                        batch['signal_bias_mask'][i] = signal_bias_mask + [0] * (
+                                    sequence_length - len(signal_bias_mask))
 
                 batch = {k: torch.tensor(v, dtype=torch.int64) for k, v in batch.items()}
                 if word_ids is not None:
                     batch["word_ids"] = word_ids
                     batch["text"] = texts
                 return batch
-        
+
         data_collator = DataCollatorForTokenClassification(
             tokenizer, pad_to_multiple_of=(8 if accelerator.use_fp16 else None)
         )
@@ -972,7 +966,7 @@ def main_st2(arg):
 
         # Use the device given by the `accelerator` object.
         device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-        #device = accelerator.device
+        # device = accelerator.device
         model.to(device)
 
         # Scheduler and math around the number of training steps.
@@ -1024,8 +1018,8 @@ def main_st2(arg):
         best_cause_f1 = 0.
         best_effect_f1 = 0.
         best_signal_f1 = 0.
-        best_epoch = 0 # In terms of Overall F1
-        
+        best_epoch = 0  # In terms of Overall F1
+
         total_batch_size = args.st2_per_device_train_batch_size * accelerator.num_processes * args.st2_gradient_accumulation_steps
 
         logger.info("***** Running training *****")
@@ -1064,15 +1058,15 @@ def main_st2(arg):
         for epoch in range(starting_epoch, args.st2_num_train_epochs):
             model.train()
             if args.st2_with_tracking:
-                #print('I am here')
+                # print('I am here')
                 total_loss = 0
             for step, batch in enumerate(train_dataloader):
                 # We need to skip steps until we reach the resumed step
                 if args.st2_resume_from_checkpoint and epoch == starting_epoch:
-                    #print('I am here2')
+                    # print('I am here2')
                     if resume_step is not None and step < resume_step:
                         completed_steps += 1
-                        #print('I am here3')
+                        # print('I am here3')
                         continue
                 outputs = model(**batch)
                 loss = outputs["loss"]
@@ -1091,20 +1085,15 @@ def main_st2(arg):
 
                 if isinstance(checkpointing_steps, int):
                     if completed_steps % checkpointing_steps == 0:
-                        output_dir = f"step_{completed_steps }"
+                        output_dir = f"step_{completed_steps}"
                         if args.st2_output_dir is not None:
                             output_dir = os.path.join(args.st2_output_dir, output_dir)
                         accelerator.save_state(output_dir)
-                        #print('I am here again')
+                        # print('I am here again')
 
                 if completed_steps >= args.st2_max_train_steps:
                     print('yes completed')
                     break
-                
-
-                
-
-            
 
             print('evaluation will start')
 
@@ -1113,10 +1102,11 @@ def main_st2(arg):
 
             predictions = []
             for step, batch in enumerate(eval_dataloader):
-                #print('I am here ', step)
+                # print('I am here ', step)
 
                 with torch.no_grad():
-                    outputs = model(**{k: batch[k] if k in batch else None for k in ["input_ids", "attention_mask", "token_type_ids", "signal_bias_mask"]})
+                    outputs = model(**{k: batch[k] if k in batch else None for k in
+                                       ["input_ids", "attention_mask", "token_type_ids", "signal_bias_mask"]})
                 # ce_predictions = outputs["ce_logits"].argmax(dim=-1).tolist()
                 # sig_predictions = outputs["sig_logits"].argmax(dim=-1).tolist()
                 start_cause_predictions = outputs["start_arg0_logits"]
@@ -1129,7 +1119,7 @@ def main_st2(arg):
                 end_signal_predictions = outputs["end_sig_logits"]
 
                 for i in range(len(batch["input_ids"])):
-                    #print('here')
+                    # print('here')
 
                     word_ids = batch["word_ids"][i]
                     space_splitted_tokens = batch["text"][i].split(" ")
@@ -1151,7 +1141,7 @@ def main_st2(arg):
                                 start_effect_logits=start_effect_predictions[i],
                                 end_effect_logits=end_effect_predictions[i],
                                 attention_mask=batch["attention_mask"][i],
-                                word_ids=word_ids,     
+                                word_ids=word_ids,
                                 topk=args.st2_topk,
                             )
                     else:
@@ -1159,7 +1149,7 @@ def main_st2(arg):
                         end_cause_predictions[i] -= (1 - batch["attention_mask"][i]) * 1e4
                         start_effect_predictions[i] -= (1 - batch["attention_mask"][i]) * 1e4
                         end_effect_predictions[i] -= (1 - batch["attention_mask"][i]) * 1e4
-                    
+
                         start_cause_predictions[i][0] = -1e4
                         end_cause_predictions[i][0] = -1e4
                         start_effect_predictions[i][0] = -1e4
@@ -1174,7 +1164,7 @@ def main_st2(arg):
                         end_cause = end_cause_predictions[i].argmax().item()
                         start_effect = start_effect_predictions[i].argmax().item()
                         end_effect = end_effect_predictions[i].argmax().item()
-                    
+
                     has_signal = 1
                     if args.st2_signal_classification:
                         if not args.st2_pretrained_signal_detector:
@@ -1194,49 +1184,66 @@ def main_st2(arg):
 
                         start_signal = start_signal_predictions[i].argmax().item()
                         end_signal_predictions[i][: start_signal] = -1e4
-                        end_signal_predictions[i][start_signal + 5: ] = -1e4
+                        end_signal_predictions[i][start_signal + 5:] = -1e4
                         end_signal = end_signal_predictions[i].argmax().item()
 
                     if not args.st2_beam_search:
-                        space_splitted_tokens[word_ids[start_cause]] = '<ARG0>' + space_splitted_tokens[word_ids[start_cause]]
-                        space_splitted_tokens[word_ids[end_cause]] = space_splitted_tokens[word_ids[end_cause]] + '</ARG0>'
-                        space_splitted_tokens[word_ids[start_effect]] = '<ARG1>' + space_splitted_tokens[word_ids[start_effect]]
-                        space_splitted_tokens[word_ids[end_effect]] = space_splitted_tokens[word_ids[end_effect]] + '</ARG1>'
-                        
+                        space_splitted_tokens[word_ids[start_cause]] = '<ARG0>' + space_splitted_tokens[
+                            word_ids[start_cause]]
+                        space_splitted_tokens[word_ids[end_cause]] = space_splitted_tokens[
+                                                                         word_ids[end_cause]] + '</ARG0>'
+                        space_splitted_tokens[word_ids[start_effect]] = '<ARG1>' + space_splitted_tokens[
+                            word_ids[start_effect]]
+                        space_splitted_tokens[word_ids[end_effect]] = space_splitted_tokens[
+                                                                          word_ids[end_effect]] + '</ARG1>'
+
                         if has_signal:
-                            space_splitted_tokens[word_ids[start_signal]] = '<SIG0>' + space_splitted_tokens[word_ids[start_signal]]
-                            space_splitted_tokens[word_ids[end_signal]] = space_splitted_tokens[word_ids[end_signal]] + '</SIG0>'
-                        
+                            space_splitted_tokens[word_ids[start_signal]] = '<SIG0>' + space_splitted_tokens[
+                                word_ids[start_signal]]
+                            space_splitted_tokens[word_ids[end_signal]] = space_splitted_tokens[
+                                                                              word_ids[end_signal]] + '</SIG0>'
+
                         predictions.append([' '.join(space_splitted_tokens)] * 2)
                     else:
                         start_cause, end_cause, start_effect, end_effect = indices1
 
                         this_space_splitted_tokens = copy.deepcopy(space_splitted_tokens)
-                        this_space_splitted_tokens[word_ids[start_cause]] = '<ARG0>' + this_space_splitted_tokens[word_ids[start_cause]]
-                        this_space_splitted_tokens[word_ids[end_cause]] = this_space_splitted_tokens[word_ids[end_cause]] + '</ARG0>'
-                        this_space_splitted_tokens[word_ids[start_effect]] = '<ARG1>' + this_space_splitted_tokens[word_ids[start_effect]]
-                        this_space_splitted_tokens[word_ids[end_effect]] = this_space_splitted_tokens[word_ids[end_effect]] + '</ARG1>'
+                        this_space_splitted_tokens[word_ids[start_cause]] = '<ARG0>' + this_space_splitted_tokens[
+                            word_ids[start_cause]]
+                        this_space_splitted_tokens[word_ids[end_cause]] = this_space_splitted_tokens[
+                                                                              word_ids[end_cause]] + '</ARG0>'
+                        this_space_splitted_tokens[word_ids[start_effect]] = '<ARG1>' + this_space_splitted_tokens[
+                            word_ids[start_effect]]
+                        this_space_splitted_tokens[word_ids[end_effect]] = this_space_splitted_tokens[
+                                                                               word_ids[end_effect]] + '</ARG1>'
 
                         if has_signal:
-                            this_space_splitted_tokens[word_ids[start_signal]] = '<SIG0>' + this_space_splitted_tokens[word_ids[start_signal]]
-                            this_space_splitted_tokens[word_ids[end_signal]] = this_space_splitted_tokens[word_ids[end_signal]] + '</SIG0>'
+                            this_space_splitted_tokens[word_ids[start_signal]] = '<SIG0>' + this_space_splitted_tokens[
+                                word_ids[start_signal]]
+                            this_space_splitted_tokens[word_ids[end_signal]] = this_space_splitted_tokens[
+                                                                                   word_ids[end_signal]] + '</SIG0>'
                         generated_sentence_1 = ' '.join(this_space_splitted_tokens)
 
                         start_cause, end_cause, start_effect, end_effect = indices2
 
                         this_space_splitted_tokens = copy.deepcopy(space_splitted_tokens)
-                        this_space_splitted_tokens[word_ids[start_cause]] = '<ARG0>' + this_space_splitted_tokens[word_ids[start_cause]]
-                        this_space_splitted_tokens[word_ids[end_cause]] = this_space_splitted_tokens[word_ids[end_cause]] + '</ARG0>'
-                        this_space_splitted_tokens[word_ids[start_effect]] = '<ARG1>' + this_space_splitted_tokens[word_ids[start_effect]]
-                        this_space_splitted_tokens[word_ids[end_effect]] = this_space_splitted_tokens[word_ids[end_effect]] + '</ARG1>'
-                        
+                        this_space_splitted_tokens[word_ids[start_cause]] = '<ARG0>' + this_space_splitted_tokens[
+                            word_ids[start_cause]]
+                        this_space_splitted_tokens[word_ids[end_cause]] = this_space_splitted_tokens[
+                                                                              word_ids[end_cause]] + '</ARG0>'
+                        this_space_splitted_tokens[word_ids[start_effect]] = '<ARG1>' + this_space_splitted_tokens[
+                            word_ids[start_effect]]
+                        this_space_splitted_tokens[word_ids[end_effect]] = this_space_splitted_tokens[
+                                                                               word_ids[end_effect]] + '</ARG1>'
+
                         if has_signal:
-                            this_space_splitted_tokens[word_ids[start_signal]] = '<SIG0>' + this_space_splitted_tokens[word_ids[start_signal]]
-                            this_space_splitted_tokens[word_ids[end_signal]] = this_space_splitted_tokens[word_ids[end_signal]] + '</SIG0>'
+                            this_space_splitted_tokens[word_ids[start_signal]] = '<SIG0>' + this_space_splitted_tokens[
+                                word_ids[start_signal]]
+                            this_space_splitted_tokens[word_ids[end_signal]] = this_space_splitted_tokens[
+                                                                                   word_ids[end_signal]] + '</SIG0>'
                         generated_sentence_2 = ' '.join(this_space_splitted_tokens)
 
                         predictions.append([generated_sentence_1, generated_sentence_2])
-
 
             main_results, _ = eval_st2(truth, predictions)
             print('main results', main_results)
@@ -1248,33 +1255,41 @@ def main_st2(arg):
             best_effect_f1 = max(best_effect_f1, main_results["Effect"]["f1"])
             best_signal_f1 = max(best_signal_f1, main_results["Signal"]["f1"])
 
-            logger.info("Cause | P: {} | R: {} | F1: {}".format(main_results["Cause"]["precision"], main_results["Cause"]["recall"], main_results["Cause"]["f1"]))
-            logger.info("Effect | P: {} | R: {} | F1: {}".format(main_results["Effect"]["precision"], main_results["Effect"]["recall"], main_results["Effect"]["f1"]))
-            logger.info("Signal | P: {} | R: {} | F1: {}".format(main_results["Signal"]["precision"], main_results["Signal"]["recall"], main_results["Signal"]["f1"]))
-            logger.info("Overall | P: {} | R: {} | F1: {}".format(main_results["Overall"]["precision"], main_results["Overall"]["recall"], main_results["Overall"]["f1"]))
+            logger.info("Cause | P: {} | R: {} | F1: {}".format(main_results["Cause"]["precision"],
+                                                                main_results["Cause"]["recall"],
+                                                                main_results["Cause"]["f1"]))
+            logger.info("Effect | P: {} | R: {} | F1: {}".format(main_results["Effect"]["precision"],
+                                                                 main_results["Effect"]["recall"],
+                                                                 main_results["Effect"]["f1"]))
+            logger.info("Signal | P: {} | R: {} | F1: {}".format(main_results["Signal"]["precision"],
+                                                                 main_results["Signal"]["recall"],
+                                                                 main_results["Signal"]["f1"]))
+            logger.info("Overall | P: {} | R: {} | F1: {}".format(main_results["Overall"]["precision"],
+                                                                  main_results["Overall"]["recall"],
+                                                                  main_results["Overall"]["f1"]))
             logger.info("best-overall-f1: {}, from epoch {}".format(best_overall_f1, best_epoch))
             if args.st2_with_tracking:
                 wandb.log(
-                {
-                    "Best-Overall-F1": best_overall_f1,
-                    "Best-Epoch": best_epoch,
-                    "Best-Cause-F1": best_cause_f1,
-                    "Best-Effect-F1": best_effect_f1,
-                    "Best-Signal-F1": best_signal_f1,
-                    "Cause-Precision": main_results["Cause"]["precision"],
-                    "Cause-Recall": main_results["Cause"]["recall"],
-                    "Cause-F1": main_results["Cause"]["f1"],
-                    "Effect-Precision": main_results["Effect"]["precision"],
-                    "Effect-Recall": main_results["Effect"]["recall"],
-                    "Effect-F1": main_results["Effect"]["f1"],
-                    "Signal-Precision": main_results["Signal"]["precision"],
-                    "Signal-Recall": main_results["Signal"]["recall"],
-                    "Signal-F1": main_results["Signal"]["f1"],
-                    "Overall-Precision": main_results["Overall"]["precision"],
-                    "Overall-Recall": main_results["Overall"]["recall"],
-                    "Overall-F1": main_results["Overall"]["f1"],
-                }
-            )
+                    {
+                        "Best-Overall-F1": best_overall_f1,
+                        "Best-Epoch": best_epoch,
+                        "Best-Cause-F1": best_cause_f1,
+                        "Best-Effect-F1": best_effect_f1,
+                        "Best-Signal-F1": best_signal_f1,
+                        "Cause-Precision": main_results["Cause"]["precision"],
+                        "Cause-Recall": main_results["Cause"]["recall"],
+                        "Cause-F1": main_results["Cause"]["f1"],
+                        "Effect-Precision": main_results["Effect"]["precision"],
+                        "Effect-Recall": main_results["Effect"]["recall"],
+                        "Effect-F1": main_results["Effect"]["f1"],
+                        "Signal-Precision": main_results["Signal"]["precision"],
+                        "Signal-Recall": main_results["Signal"]["recall"],
+                        "Signal-F1": main_results["Signal"]["f1"],
+                        "Overall-Precision": main_results["Overall"]["precision"],
+                        "Overall-Recall": main_results["Overall"]["recall"],
+                        "Overall-F1": main_results["Overall"]["f1"],
+                    }
+                )
 
             output_dir = f"epoch_{epoch}"
             if args.st2_output_dir is not None:
@@ -1292,7 +1307,7 @@ def main_st2(arg):
                         f.write("Prediction:\n")
                         f.write(f"{predictions[row[0]]}\n")
                         f.write("===============================\n")
-            
+
             # export result of every epoch to the file
             with open(f"{output_dir}/submission.json", "w") as f:
                 for i, prediction in enumerate(predictions):
@@ -1303,24 +1318,24 @@ def main_st2(arg):
                 with open(f"{args.st2_output_dir}/best-submission.json", "w") as f:
                     for i, prediction in enumerate(predictions):
                         f.write(json.dumps({"index": i, "prediction": prediction}) + "\n")
-    
+
     if args.st2_do_test:
 
-        if args.st2_do_train: # continuing from above
-            if args.st2_use_best_model: # either use best model, or use last model
+        if args.st2_do_train:  # continuing from above
+            if args.st2_use_best_model:  # either use best model, or use last model
                 load_checkpoint_for_test = os.path.join(args.st2_output_dir, f"epoch_{best_epoch}/pytorch_model.bin")
                 accelerator.print(f"Load best model: {load_checkpoint_for_test}")
                 model.load_state_dict(torch.load(load_checkpoint_for_test))
             else:
                 # the last model is already loaded
                 pass
-        else: # need to load from checkpoint
+        else:  # need to load from checkpoint
             assert args.st2_load_checkpoint_for_test is not None
             accelerator.print(f"Load best model: {args.st2_load_checkpoint_for_test}")
-            #print("Model's state_dict:")
-            #t = model
-            #for param_tensor in t.state_dict():
-                #print(param_tensor, "\t", t.state_dict()[param_tensor].size())
+            # print("Model's state_dict:")
+            # t = model
+            # for param_tensor in t.state_dict():
+            # print(param_tensor, "\t", t.state_dict()[param_tensor].size())
             device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
             cuda_flag = False
             if torch.cuda.is_available():
@@ -1338,7 +1353,8 @@ def main_st2(arg):
         predictions = []
         for step, batch in enumerate(test_dataloader):
             with torch.no_grad():
-                outputs = model(**{k: batch[k].to(device) if k in batch else None for k in ["input_ids", "attention_mask", "token_type_ids", "signal_bias_mask"]})
+                outputs = model(**{k: batch[k].to(device) if k in batch else None for k in
+                                   ["input_ids", "attention_mask", "token_type_ids", "signal_bias_mask"]})
 
             start_cause_predictions = outputs["start_arg0_logits"]
             end_cause_predictions = outputs["end_arg0_logits"]
@@ -1370,14 +1386,14 @@ def main_st2(arg):
                             start_effect_logits=start_effect_predictions[i],
                             end_effect_logits=end_effect_predictions[i],
                             attention_mask=batch["attention_mask"][i],
-                            word_ids=word_ids,     
+                            word_ids=word_ids,
                         )
                 else:
                     start_cause_predictions[i] -= (1 - batch["attention_mask"][i].to(device)) * 1e4
                     end_cause_predictions[i] -= (1 - batch["attention_mask"][i].to(device)) * 1e4
                     start_effect_predictions[i] -= (1 - batch["attention_mask"][i].to(device)) * 1e4
                     end_effect_predictions[i] -= (1 - batch["attention_mask"][i].to(device)) * 1e4
-                
+
                     start_cause_predictions[i][0] = -1e4
                     end_cause_predictions[i][0] = -1e4
                     start_effect_predictions[i][0] = -1e4
@@ -1392,7 +1408,7 @@ def main_st2(arg):
                     end_cause = end_cause_predictions[i].argmax().item()
                     start_effect = start_effect_predictions[i].argmax().item()
                     end_effect = end_effect_predictions[i].argmax().item()
-                
+
                 has_signal = 1
                 if args.st2_signal_classification:
                     if not args.st2_pretrained_signal_detector:
@@ -1412,55 +1428,72 @@ def main_st2(arg):
 
                     start_signal = start_signal_predictions[i].argmax().item()
                     end_signal_predictions[i][: start_signal] = -1e4
-                    end_signal_predictions[i][start_signal + 5: ] = -1e4
+                    end_signal_predictions[i][start_signal + 5:] = -1e4
                     end_signal = end_signal_predictions[i].argmax().item()
 
                 if not args.st2_beam_search:
-                    space_splitted_tokens[word_ids[start_cause]] = '<ARG0>' + space_splitted_tokens[word_ids[start_cause]]
+                    space_splitted_tokens[word_ids[start_cause]] = '<ARG0>' + space_splitted_tokens[
+                        word_ids[start_cause]]
                     space_splitted_tokens[word_ids[end_cause]] = space_splitted_tokens[word_ids[end_cause]] + '</ARG0>'
-                    space_splitted_tokens[word_ids[start_effect]] = '<ARG1>' + space_splitted_tokens[word_ids[start_effect]]
-                    space_splitted_tokens[word_ids[end_effect]] = space_splitted_tokens[word_ids[end_effect]] + '</ARG1>'
-                    
+                    space_splitted_tokens[word_ids[start_effect]] = '<ARG1>' + space_splitted_tokens[
+                        word_ids[start_effect]]
+                    space_splitted_tokens[word_ids[end_effect]] = space_splitted_tokens[
+                                                                      word_ids[end_effect]] + '</ARG1>'
+
                     if has_signal:
-                        space_splitted_tokens[word_ids[start_signal]] = '<SIG0>' + space_splitted_tokens[word_ids[start_signal]]
-                        space_splitted_tokens[word_ids[end_signal]] = space_splitted_tokens[word_ids[end_signal]] + '</SIG0>'
-                    
+                        space_splitted_tokens[word_ids[start_signal]] = '<SIG0>' + space_splitted_tokens[
+                            word_ids[start_signal]]
+                        space_splitted_tokens[word_ids[end_signal]] = space_splitted_tokens[
+                                                                          word_ids[end_signal]] + '</SIG0>'
+
                     predictions.append([' '.join(space_splitted_tokens)] * 2)
                 else:
                     start_cause, end_cause, start_effect, end_effect = indices1
 
                     this_space_splitted_tokens = copy.deepcopy(space_splitted_tokens)
-                    this_space_splitted_tokens[word_ids[start_cause]] = '<ARG0>' + this_space_splitted_tokens[word_ids[start_cause]]
-                    this_space_splitted_tokens[word_ids[end_cause]] = this_space_splitted_tokens[word_ids[end_cause]] + '</ARG0>'
-                    this_space_splitted_tokens[word_ids[start_effect]] = '<ARG1>' + this_space_splitted_tokens[word_ids[start_effect]]
-                    this_space_splitted_tokens[word_ids[end_effect]] = this_space_splitted_tokens[word_ids[end_effect]] + '</ARG1>'
+                    this_space_splitted_tokens[word_ids[start_cause]] = '<ARG0>' + this_space_splitted_tokens[
+                        word_ids[start_cause]]
+                    this_space_splitted_tokens[word_ids[end_cause]] = this_space_splitted_tokens[
+                                                                          word_ids[end_cause]] + '</ARG0>'
+                    this_space_splitted_tokens[word_ids[start_effect]] = '<ARG1>' + this_space_splitted_tokens[
+                        word_ids[start_effect]]
+                    this_space_splitted_tokens[word_ids[end_effect]] = this_space_splitted_tokens[
+                                                                           word_ids[end_effect]] + '</ARG1>'
 
                     if has_signal:
-                        this_space_splitted_tokens[word_ids[start_signal]] = '<SIG0>' + this_space_splitted_tokens[word_ids[start_signal]]
-                        this_space_splitted_tokens[word_ids[end_signal]] = this_space_splitted_tokens[word_ids[end_signal]] + '</SIG0>'
+                        this_space_splitted_tokens[word_ids[start_signal]] = '<SIG0>' + this_space_splitted_tokens[
+                            word_ids[start_signal]]
+                        this_space_splitted_tokens[word_ids[end_signal]] = this_space_splitted_tokens[
+                                                                               word_ids[end_signal]] + '</SIG0>'
                     generated_sentence_1 = ' '.join(this_space_splitted_tokens)
 
                     start_cause, end_cause, start_effect, end_effect = indices2
 
                     this_space_splitted_tokens = copy.deepcopy(space_splitted_tokens)
-                    this_space_splitted_tokens[word_ids[start_cause]] = '<ARG0>' + this_space_splitted_tokens[word_ids[start_cause]]
-                    this_space_splitted_tokens[word_ids[end_cause]] = this_space_splitted_tokens[word_ids[end_cause]] + '</ARG0>'
-                    this_space_splitted_tokens[word_ids[start_effect]] = '<ARG1>' + this_space_splitted_tokens[word_ids[start_effect]]
-                    this_space_splitted_tokens[word_ids[end_effect]] = this_space_splitted_tokens[word_ids[end_effect]] + '</ARG1>'
-                    
+                    this_space_splitted_tokens[word_ids[start_cause]] = '<ARG0>' + this_space_splitted_tokens[
+                        word_ids[start_cause]]
+                    this_space_splitted_tokens[word_ids[end_cause]] = this_space_splitted_tokens[
+                                                                          word_ids[end_cause]] + '</ARG0>'
+                    this_space_splitted_tokens[word_ids[start_effect]] = '<ARG1>' + this_space_splitted_tokens[
+                        word_ids[start_effect]]
+                    this_space_splitted_tokens[word_ids[end_effect]] = this_space_splitted_tokens[
+                                                                           word_ids[end_effect]] + '</ARG1>'
+
                     if has_signal:
-                        this_space_splitted_tokens[word_ids[start_signal]] = '<SIG0>' + this_space_splitted_tokens[word_ids[start_signal]]
-                        this_space_splitted_tokens[word_ids[end_signal]] = this_space_splitted_tokens[word_ids[end_signal]] + '</SIG0>'
+                        this_space_splitted_tokens[word_ids[start_signal]] = '<SIG0>' + this_space_splitted_tokens[
+                            word_ids[start_signal]]
+                        this_space_splitted_tokens[word_ids[end_signal]] = this_space_splitted_tokens[
+                                                                               word_ids[end_signal]] + '</SIG0>'
                     generated_sentence_2 = ' '.join(this_space_splitted_tokens)
 
                     predictions.append([generated_sentence_1, generated_sentence_2])
 
         # export result of every epoch to the file
-        with open(os.path.join(args.st2_output_dir,f"test-submission-{datetime.now()}.json"), "w") as f:
+        with open(os.path.join(args.st2_output_dir, f"test-submission-{datetime.now()}.json"), "w") as f:
             for i, prediction in enumerate(predictions):
                 f.write(json.dumps({"index": i, "prediction": prediction}) + "\n")
-                
-        with open(os.path.join(args.st2_output_dir,f"test-submission-temp.json"), "w") as f:
+
+        with open(os.path.join(args.st2_output_dir, f"test-submission-temp.json"), "w") as f:
             for i, prediction in enumerate(predictions):
                 f.write(json.dumps({"index": i, "prediction": prediction}) + "\n")
 
