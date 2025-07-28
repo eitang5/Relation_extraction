@@ -4,7 +4,7 @@ import requests
 import streamlit as st
 from annotated_text import annotated_text # https://pypi.org/project/st-annotated-text/
 
-SERVER = 'http://localhost:5004'
+SERVER = 'https://kflow.eurecom.fr'
 COLOR_MAP = {'cause':'#fea', 'enable':'#8ef', 'prevent':'#afa', 'intend':'#faf', 'invalid':'#faa'}
 PRESETS = ['', 
         '[Wrong inferences example] Lalu , Rabri upbeat after success of shutdown 29th January 2010 01:40 PM An RJD activist wears a garland and crown made of vegetables and shouts slogans along with others during a protest against inflation in Patna . Protests were held across Andhra Pradesh criticising police action on Naidu and his supporters . Denied Aid , Dalit Boy tries to End Life. So we are asking people to come out because it may be the last time that we are going to have a peaceful and lawful protest in Hong Kong , ” said one of the organisers of the rally.  Mining for trouble Sino Gold Mining , which only last week announced a joint venture to expand exploration near its White Mountain Mine in Jilin province , had to halt operations yesterday as protesting farmers blocked the main access road .',
