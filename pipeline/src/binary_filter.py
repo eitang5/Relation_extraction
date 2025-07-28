@@ -136,10 +136,7 @@ def run_filter(args):
     predicted_df.loc[3, 'label'] = 3
     s = '<triplet> reaching <subj> agreed <obj> cause'
     predicted_df['triplets'] = s
-    predicted_df.to_csv('causal_outs/predicted_as_causal.csv', index=False)
-    predicted_df.loc[predicted_df['num_rs'] > 0].to_csv('causal_outs/only_causal.csv', index=False)
     c = predicted_df.loc[predicted_df['num_rs'] > 0]
-    predicted_df.loc[predicted_df['num_rs'] == 1].to_csv('causal_outs/only_causal_single.csv', index=False)
     c = c.reset_index(drop=True)
     return c
 

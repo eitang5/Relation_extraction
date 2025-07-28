@@ -49,8 +49,12 @@ then run the image with
 docker run -d -p 5004:5004 -v $(pwd)/pretrained_models:/pretrained_models -v $(pwd)/out:/out --name kflow_rel_extraction kflow/rel_extraction
 ```
 
+
+[//]: # (docker run -d -p 5002:5004 -v /data/kflow-dataset:/data -v /data/kflow-model/pretrained_models:/pretrained_models -v /data/kflow-model/out:/out --name kflow_rel_extraction kflow/rel_extraction)
+
+
 When running the link that is given in the terminal change the local port number to the number that you exported from your local machine.
-For the previous example it would be http://127.0.0.1:5004/swagger/
+For the previous example it would be http://127.0.0.1:5002/swagger/
 > (Be sure to add the /swagger to the end of the link)
 
 For the demo, run
@@ -89,7 +93,7 @@ Any value that is not specified will be filled in by the default value that is d
 
     python pypeline.simplified.py
     
-Arguements can be added at the end to change the configuration of the pipeline, like:
+Arguments can be added at the end to change the configuration of the pipeline, like:
 
     python pypeline.simplified.py --text_from_user "This is a test sentence."
 

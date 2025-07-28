@@ -207,4 +207,3 @@ dependencies:
   - zipp=3.21.0=py311h06a4308_0
   - zstandard=0.23.0=py311h9ecbd09_2
   - zstd=1.5.7=hb8e6e7a_2
-prefix: /home/semantic/.conda/envs/rel_extractor
