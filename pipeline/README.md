@@ -121,5 +121,5 @@ If you use this software, please cite ([bib file](https://hal.science/hal-051355
 
 Gustavo Flores Miguel, Youssra Rebboud, Pasquale Lisena, Raphäel Troncy.
 **Streamlining Event Relation Extraction: A Pipeline Leveraging Pretrained and Large Language Models for Inference.**
-In: *EKAW 2024, 24th International Conference on Knowledge Engineering and Knowledge Management*, Poster and Demo Track, CEUR, Nov 2024, Amsterdam, Netherlands.
+In: *EKAW 2024, 24th International Conference on Knowledge Engineering and Knowledge Management*, Poster and Demo Track, CEUR-WS, Nov 2024, Amsterdam, Netherlands.
 https://ceur-ws.org/Vol-3967/PD_paper_184.pdf
