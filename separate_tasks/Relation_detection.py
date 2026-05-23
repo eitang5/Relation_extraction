@@ -73,12 +73,12 @@ class CustomDataset(Dataset):
 # Set device
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-# Define parameters
-MAX_LEN = 128
-TRAIN_BATCH_SIZE = 8
-VALID_BATCH_SIZE = 8
-EPOCHS = 10
-LEARNING_RATE = 2e-5
+# Define parameters (env-overridable for Colab/cluster)
+MAX_LEN = int(os.environ.get("MAX_LEN", 128))
+TRAIN_BATCH_SIZE = int(os.environ.get("BATCH_SIZE", 8))
+VALID_BATCH_SIZE = int(os.environ.get("BATCH_SIZE", 8))
+EPOCHS = int(os.environ.get("EPOCHS", 10))
+LEARNING_RATE = float(os.environ.get("LEARNING_RATE", 2e-5))
 
 ## Initialize tokenizer and model
 #tokenizer = RobertaTokenizer.from_pretrained('roberta-base')
