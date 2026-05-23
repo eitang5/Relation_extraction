@@ -8,17 +8,29 @@ import os
 from transformers import RobertaTokenizer, RobertaForTokenClassification
 
 
-MODEL_NAME = "FacebookAI/roberta-large"
+# --- Config (override via environment variables in Colab/cluster) ---
+MODEL_NAME = os.environ.get("MODEL_NAME", "FacebookAI/roberta-large")
+OUTPUT_DIR = os.environ.get("OUTPUT_DIR", "checkpoints/st1_roberta")
+TRAIN_FILE = os.environ.get("TRAIN_FILE", "data/Combined_dataset_CommonSense+News_Data/combined.csv")
+DEV_FILE   = os.environ.get("DEV_FILE",   "data/News_data/dev.csv")
+TEST_FILE  = os.environ.get("TEST_FILE",  "data/Test_dataset/test.csv")
+SEED = int(os.environ.get("SEED", 42))
+# Optional caps (mainly for sanity runs); empty string = use all rows
+MAX_TRAIN = int(os.environ["MAX_TRAIN"]) if os.environ.get("MAX_TRAIN") else None
+MAX_DEV   = int(os.environ["MAX_DEV"])   if os.environ.get("MAX_DEV")   else None
+MAX_TEST  = int(os.environ["MAX_TEST"])  if os.environ.get("MAX_TEST")  else None
+os.makedirs(OUTPUT_DIR, exist_ok=True)
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
-# Load datasets
-train_file = "/data/Youss/RE/TACL/end_to_end_models/Bert_based_classification/combined.csv"
-dev_file = "/data/Youss/RE/TACL/end_to_end_models/Bert_based_classification/dev.csv"
-test_file = "/data/Youss/RE/TACL/end_to_end_models/Bert_based_classification/test.csv"
+# Load datasets (shuffle for reproducibility; cap if MAX_* is set)
+def _load(path, cap):
+    df = pd.read_csv(path).sample(frac=1.0, random_state=SEED).reset_index(drop=True)
+    return df.iloc[:cap] if cap else df
 
-df_train = pd.read_csv(train_file).sample(6790)
-df_dev = pd.read_csv(dev_file).sample(620)
-df_test = pd.read_csv(test_file).sample(630)
+df_train = _load(TRAIN_FILE, MAX_TRAIN)
+df_dev   = _load(DEV_FILE,   MAX_DEV)
+df_test  = _load(TEST_FILE,  MAX_TEST)
+print(f"Loaded: train={len(df_train)} dev={len(df_dev)} test={len(df_test)}")
 
 # Ensure correct column names
 df_train = df_train.rename(columns={"text": "text", "relation": "label"})
@@ -60,15 +72,16 @@ model = AutoModelForSequenceClassification.from_pretrained(
     MODEL_NAME, num_labels=len(label2id), id2label=id2label, label2id=label2id
 ).to(device)
 
-optimizer = torch.optim.AdamW(model.parameters(), lr=2e-5)
+LEARNING_RATE = float(os.environ.get("LEARNING_RATE", 2e-5))
+optimizer = torch.optim.AdamW(model.parameters(), lr=LEARNING_RATE)
 
 train_dataset = tokenized_datasets["train"]
 validation_dataset = tokenized_datasets["validation"]
 
-epochs = 10
-batch_size = 8
+epochs = int(os.environ.get("EPOCHS", 10))
+batch_size = int(os.environ.get("BATCH_SIZE", 8))
 best_val_loss = float("inf")
-best_model_path = "./new_roberta_rc_combined"
+best_model_path = OUTPUT_DIR
 
 
 from tqdm import tqdm
@@ -149,7 +162,7 @@ report = classification_report(all_labels, all_preds, target_names=[id2label[i] 
 print(report)
 
 
-with open("classification_report_combined_roberta.txt", "w") as f:
+with open(os.path.join(OUTPUT_DIR, "classification_report.txt"), "w") as f:
     f.write(report)
 
 # # Free GPU memory after evaluation
