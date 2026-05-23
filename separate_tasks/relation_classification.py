@@ -24,7 +24,14 @@ os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
 # Load datasets (shuffle for reproducibility; cap if MAX_* is set)
 def _load(path, cap):
-    df = pd.read_csv(path).sample(frac=1.0, random_state=SEED).reset_index(drop=True)
+    df = pd.read_csv(path)
+    # Coerce to plain Python strings and drop any rows missing text/relation.
+    # Newer pandas uses StringDtype which datasets.Dataset.from_pandas can
+    # surface as a non-list type to the tokenizer; astype(object) avoids that.
+    df = df.dropna(subset=['text', 'relation'])
+    df['text']     = df['text'].astype(object).map(str)
+    df['relation'] = df['relation'].astype(object).map(str)
+    df = df.sample(frac=1.0, random_state=SEED).reset_index(drop=True)
     return df.iloc[:cap] if cap else df
 
 df_train = _load(TRAIN_FILE, MAX_TRAIN)
@@ -49,8 +56,14 @@ df_test['label'] = df_test['label'].map(label2id)
 
 tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME)
 
+def _as_str_list(x):
+    # Defensive: datasets >= 3 can return non-list types (Arrow array, numpy
+    # array) from `dataset[col]`/`select()[col]` that the tokenizer rejects
+    # with "text input must be of type str ...".
+    return [str(t) for t in x]
+
 def tokenize_function(examples):
-    tokenized_inputs = tokenizer(examples["text"], padding="max_length", truncation=True)
+    tokenized_inputs = tokenizer(_as_str_list(examples["text"]), padding="max_length", truncation=True)
     tokenized_inputs["label"] = examples["label"]
     return tokenized_inputs
 
@@ -93,7 +106,7 @@ for epoch in range(epochs):
 
     for i in progress_bar:
         batch = train_dataset.select(range(i, min(i + batch_size, len(train_dataset))))
-        inputs = tokenizer(batch["text"], padding=True, truncation=True, return_tensors="pt").to(device)
+        inputs = tokenizer(_as_str_list(batch["text"]), padding=True, truncation=True, return_tensors="pt").to(device)
         labels = torch.tensor(batch["label"], dtype=torch.long).to(device)
 
         optimizer.zero_grad()
@@ -112,7 +125,7 @@ for epoch in range(epochs):
     val_loss = 0
     for i in range(0, len(validation_dataset), batch_size):
         batch = validation_dataset.select(range(i, min(i + batch_size, len(validation_dataset))))
-        inputs = tokenizer(batch["text"], padding=True, truncation=True, return_tensors="pt").to(device)
+        inputs = tokenizer(_as_str_list(batch["text"]), padding=True, truncation=True, return_tensors="pt").to(device)
         labels = torch.tensor(batch["label"]).to(device)
         with torch.no_grad():
             outputs = model(**inputs, labels=labels)
@@ -149,7 +162,7 @@ for i in range(0, len(test_texts), batch_size):
     batch_texts = test_texts[i : i + batch_size]
     batch_labels = test_labels[i : i + batch_size]
 
-    inputs = tokenizer(batch_texts, padding=True, truncation=True, return_tensors="pt").to(device)
+    inputs = tokenizer(_as_str_list(batch_texts), padding=True, truncation=True, return_tensors="pt").to(device)
     with torch.no_grad():
         outputs = model(**inputs)
         preds = torch.argmax(outputs.logits, dim=-1)
