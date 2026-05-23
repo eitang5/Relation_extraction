@@ -7,13 +7,26 @@ import pandas as pd
 from sklearn.metrics import classification_report
 from tqdm import tqdm
 from sklearn.metrics import classification_report, f1_score
-# Configuration
-MODEL_NAME = "dslim/bert-large-NER"
-MAX_LEN = 128
-BATCH_SIZE = 16
-EPOCHS = 10
-LEARNING_RATE = 2e-5
-BIO_LABELS = {"O": 0, "B-SUBJ": 1, "I-SUBJ": 2, "B-OBJ": 3, "I-OBJ": 4}
+import os
+
+# --- Config (override via environment variables in Colab/cluster) ---
+MODEL_NAME    = os.environ.get("MODEL_NAME", "dslim/bert-large-NER")
+OUTPUT_DIR    = os.environ.get("OUTPUT_DIR", "checkpoints/st2_bert_ner")
+TRAIN_FILE    = os.environ.get("TRAIN_FILE", "data/Combined_dataset_CommonSense+News_Data/combined.csv")
+DEV_FILE      = os.environ.get("DEV_FILE",   "data/News_data/dev.csv")
+TEST_FILE     = os.environ.get("TEST_FILE",  "data/Test_dataset/test.csv")
+MAX_LEN       = int(os.environ.get("MAX_LEN", 128))
+BATCH_SIZE    = int(os.environ.get("BATCH_SIZE", 16))
+EPOCHS        = int(os.environ.get("EPOCHS", 10))
+LEARNING_RATE = float(os.environ.get("LEARNING_RATE", 2e-5))
+SEED          = int(os.environ.get("SEED", 42))
+MAX_TRAIN     = int(os.environ["MAX_TRAIN"]) if os.environ.get("MAX_TRAIN") else None
+MAX_DEV       = int(os.environ["MAX_DEV"])   if os.environ.get("MAX_DEV")   else None
+MAX_TEST      = int(os.environ["MAX_TEST"])  if os.environ.get("MAX_TEST")  else None
+os.makedirs(OUTPUT_DIR, exist_ok=True)
+
+BIO_LABELS   = {"O": 0, "B-SUBJ": 1, "I-SUBJ": 2, "B-OBJ": 3, "I-OBJ": 4}
+ID2LABEL_BIO = {v: k for k, v in BIO_LABELS.items()}
 
 tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME)
 
@@ -74,16 +87,28 @@ class BIOTaggingDataset(Dataset):
 class NERModel(nn.Module):
     def __init__(self, model_name, num_labels):
         super(NERModel, self).__init__()
-        self.bert = AutoModelForTokenClassification.from_pretrained(model_name, num_labels=num_labels, ignore_mismatched_sizes=True)
+        self.bert = AutoModelForTokenClassification.from_pretrained(
+            model_name,
+            num_labels=num_labels,
+            id2label=ID2LABEL_BIO,
+            label2id=BIO_LABELS,
+            ignore_mismatched_sizes=True,
+        )
 
     def forward(self, input_ids, attention_mask):
         outputs = self.bert(input_ids=input_ids, attention_mask=attention_mask)
         return outputs.logits
 
 
-# Load dataset
-def load_data(filepath):
-    df = pd.read_csv(filepath) # Ensure the CSV has 'text', 'subject', 'object' columns
+# Load dataset (shuffle for reproducibility; cap if MAX_* is set; coerce to str)
+def load_data(filepath, cap=None):
+    df = pd.read_csv(filepath)
+    df = df.dropna(subset=['text', 'subject', 'object', 'relation'])
+    for col in ('text', 'subject', 'object', 'relation'):
+        df[col] = df[col].astype(object).map(str)
+    df = df.sample(frac=1.0, random_state=SEED).reset_index(drop=True)
+    if cap:
+        df = df.iloc[:cap]
     return df
 
 
@@ -108,13 +133,10 @@ def evaluate(model, dataloader, device):
 def train():
 
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        train_dataset = BIOTaggingDataset(
-            load_data("/data/Youss/RE/TACL/end_to_end_models/Bert_based_classification/train.csv"))
-        dev_dataset = BIOTaggingDataset(
-            load_data("/data/Youss/RE/TACL/end_to_end_models/Bert_based_classification/dev.csv"))
-        test_dataset = BIOTaggingDataset(
-            load_data("/data/Youss/RE/TACL/end_to_end_models/Bert_based_classification/test.csv"))
-
+        train_dataset = BIOTaggingDataset(load_data(TRAIN_FILE, cap=MAX_TRAIN))
+        dev_dataset   = BIOTaggingDataset(load_data(DEV_FILE,   cap=MAX_DEV))
+        test_dataset  = BIOTaggingDataset(load_data(TEST_FILE,  cap=MAX_TEST))
+        print(f"Loaded: train={len(train_dataset)} dev={len(dev_dataset)} test={len(test_dataset)}")
 
         train_loader = DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=True)
         dev_loader = DataLoader(dev_dataset, batch_size=BATCH_SIZE, shuffle=False)
@@ -124,7 +146,6 @@ def train():
         optimizer = optim.AdamW(model.parameters(), lr=LEARNING_RATE)
         criterion = nn.CrossEntropyLoss()
         best_f1 = 0.0
-        best_model_path = "bert-large-NER_news.pth"
 
         model.train()
         for epoch in range(EPOCHS):
@@ -149,8 +170,10 @@ def train():
 
             if f1 > best_f1:
                 best_f1 = f1
-                torch.save(model.state_dict(), best_model_path)
-                print(f"New best model saved with F1: {best_f1}")
+                # Save as HF folder (easy resume via from_pretrained later)
+                model.bert.save_pretrained(OUTPUT_DIR)
+                tokenizer.save_pretrained(OUTPUT_DIR)
+                print(f"Saved best model to {OUTPUT_DIR} (dev macro F1={best_f1:.4f})")
 
         print("Testing on Test Set:")
         evaluate(model, test_loader, device)
