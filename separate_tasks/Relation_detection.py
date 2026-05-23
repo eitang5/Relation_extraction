@@ -10,11 +10,18 @@ from torch.utils.data import DataLoader, Dataset
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score, classification_report, f1_score
 from tqdm import tqdm
-path_to_data='/data/Youss/RE/TACL/separate_tasks/data/'
+import os
+
+# --- Config (override via environment variables in Colab/cluster) ---
+DATA_DIR = os.environ.get("DATA_DIR", "separate_tasks/data")
+OUTPUT_DIR = os.environ.get("OUTPUT_DIR", "checkpoints/st0_roberta")
+MODEL_NAME = os.environ.get("MODEL_NAME", "roberta-large")
+os.makedirs(OUTPUT_DIR, exist_ok=True)
+
 # Load the dataset
-train_data = pd.read_csv(path_to_data + 'train.csv')
-val_data = pd.read_csv(path_to_data + 'dev.csv')
-test_data = pd.read_csv(path_to_data + 'test.csv')
+train_data = pd.read_csv(os.path.join(DATA_DIR, 'train.csv'))
+val_data = pd.read_csv(os.path.join(DATA_DIR, 'dev.csv'))
+test_data = pd.read_csv(os.path.join(DATA_DIR, 'test.csv'))
 
 print("Length of train_data:", len(train_data))
 print("Length of val_data:", len(val_data))
@@ -82,7 +89,7 @@ def load_model_and_tokenizer(model_name, num_labels=2):
     return tokenizer, model
 
 
-model_name = 'roberta-large'
+model_name = MODEL_NAME
 tokenizer = AutoTokenizer.from_pretrained(model_name)
 model = AutoModelForSequenceClassification.from_pretrained(model_name, num_labels=2)
 model.to(device)
@@ -156,18 +163,18 @@ for epoch in range(EPOCHS):
     print(val_classification_report)
     print(f"Validation F1-score: {val_f1:.4f}")
 
-    # Save the best model based on validation F1-score
+    # Save the best model based on validation F1-score (HF-format folder, easy to resume from)
     if val_f1 > best_f1_score:
         best_f1_score = val_f1
-        best_model_path = f"Roberta_news.pt"
-        torch.save(model.state_dict(), best_model_path)
+        model.save_pretrained(OUTPUT_DIR)
+        tokenizer.save_pretrained(OUTPUT_DIR)
+        print(f"Saved best model to {OUTPUT_DIR} (val F1={val_f1:.4f})")
 # Test loop
 test_dataset = CustomDataset(test_data['text'], test_data['label'], tokenizer, MAX_LEN)
 test_loader = DataLoader(test_dataset, batch_size=VALID_BATCH_SIZE, shuffle=False)
 
 # Load the best model
-best_model = AutoModelForSequenceClassification.from_pretrained(model_name, num_labels=2)
-best_model.load_state_dict(torch.load(best_model_path))
+best_model = AutoModelForSequenceClassification.from_pretrained(OUTPUT_DIR)
 best_model.to(device)
 
 
