@@ -12,28 +12,40 @@ from ._inference import pick_device
 
 
 def _patch_longformer_eager_attention() -> None:
-    """Force Longformer to use eager attention.
+    """Force Longformer (and any model lacking SDPA) to silently fall back to eager.
 
     fastcoref's coref models are Longformer-based, and recent transformers
-    versions try SDPA by default — but Longformer has no SDPA implementation,
-    so the load crashes with `ValueError: LongformerModel does not support an
-    attention implementation through torch.nn.functional.scaled_dot_product_attention`.
-    fastcoref doesn't expose `attn_implementation`, so we patch it on at the
-    class level once.
-    """
-    from transformers import LongformerModel
+    versions explicitly request SDPA for them — but Longformer has no SDPA
+    implementation, so transformers raises `ValueError: LongformerModel does
+    not support an attention implementation through ... sdpa`. Patching
+    from_pretrained kwargs isn't enough because fastcoref's load path requests
+    SDPA via the config. So we patch the check itself: when SDPA is requested
+    but unsupported, silently downgrade to eager instead of raising.
 
-    if getattr(LongformerModel, "_v1_eager_patched", False):
+    Also marks Longformer as `_supports_sdpa = True` so the hard check passes;
+    Longformer's actual forward uses its custom sliding-window attention and
+    ignores the SDPA flag, so the lie is harmless.
+    """
+    from transformers import LongformerModel, PreTrainedModel
+
+    # Belt: lie about SDPA support so the hard_check_only branch doesn't raise.
+    LongformerModel._supports_sdpa = True
+
+    # Suspenders: patch the check to swallow the ValueError if it ever fires.
+    if getattr(PreTrainedModel, "_v1_sdpa_patched", False):
         return
-    orig_from_pretrained = LongformerModel.from_pretrained
+    orig_check = PreTrainedModel._check_and_enable_sdpa
 
     @classmethod
-    def patched(cls, *args, **kwargs):
-        kwargs.setdefault("attn_implementation", "eager")
-        return orig_from_pretrained(*args, **kwargs)
+    def patched_check(cls, config, hard_check_only: bool = False):
+        try:
+            return orig_check.__func__(cls, config, hard_check_only)
+        except (ValueError, ImportError):
+            config._attn_implementation = "eager"
+            return config
 
-    LongformerModel.from_pretrained = patched
-    LongformerModel._v1_eager_patched = True
+    PreTrainedModel._check_and_enable_sdpa = patched_check
+    PreTrainedModel._v1_sdpa_patched = True
 
 
 @lru_cache(maxsize=1)
