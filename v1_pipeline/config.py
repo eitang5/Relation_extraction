@@ -3,15 +3,9 @@
 import os
 
 # Checkpoint paths. Defaults assume Colab + Drive-mounted causalsense folder.
-ST0_CKPT = os.environ.get(
-    "ST0_CKPT", "/content/drive/MyDrive/causalsense/checkpoints/st0_roberta_large"
-)
-ST1_CKPT = os.environ.get(
-    "ST1_CKPT", "/content/drive/MyDrive/causalsense/checkpoints/st1_roberta_large"
-)
-ST2_CKPT = os.environ.get(
-    "ST2_CKPT", "/content/drive/MyDrive/causalsense/checkpoints/st2_bert_large_ner"
-)
+ST0_CKPT = os.environ.get("ST0_CKPT", "eitang/st0")
+ST1_CKPT = os.environ.get("ST1_CKPT", "eitang/st1")
+ST2_CKPT = os.environ.get("ST2_CKPT", "eitang/st2")
 
 # Inference settings.
 DEVICE = os.environ.get("DEVICE", "auto")  # auto | cuda | mps | cpu
