@@ -1,0 +1,5 @@
+spacy==3.8.14
+transformers==4.44.2
+torch
+fastcoref
+neo4j
