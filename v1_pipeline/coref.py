@@ -11,8 +11,35 @@ from . import config
 from ._inference import pick_device
 
 
+def _patch_longformer_eager_attention() -> None:
+    """Force Longformer to use eager attention.
+
+    fastcoref's coref models are Longformer-based, and recent transformers
+    versions try SDPA by default — but Longformer has no SDPA implementation,
+    so the load crashes with `ValueError: LongformerModel does not support an
+    attention implementation through torch.nn.functional.scaled_dot_product_attention`.
+    fastcoref doesn't expose `attn_implementation`, so we patch it on at the
+    class level once.
+    """
+    from transformers import LongformerModel
+
+    if getattr(LongformerModel, "_v1_eager_patched", False):
+        return
+    orig_from_pretrained = LongformerModel.from_pretrained
+
+    @classmethod
+    def patched(cls, *args, **kwargs):
+        kwargs.setdefault("attn_implementation", "eager")
+        return orig_from_pretrained(*args, **kwargs)
+
+    LongformerModel.from_pretrained = patched
+    LongformerModel._v1_eager_patched = True
+
+
 @lru_cache(maxsize=1)
 def _load():
+    _patch_longformer_eager_attention()
+
     device = pick_device(config.DEVICE)
     # fastcoref expects 'cuda' or 'cpu' — MPS isn't supported.
     if device == "mps":
