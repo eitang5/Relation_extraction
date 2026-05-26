@@ -70,5 +70,7 @@ def coref_article(article_text: str) -> list[list[tuple[int, int]]]:
     is a list of (start_char, end_char) tuples into article_text."""
     model = _load()
     preds = model.predict(texts=[article_text])
+    if not preds:
+        return []
     clusters = preds[0].get_clusters(as_strings=False)
     return [[tuple(span) for span in cluster] for cluster in clusters]
