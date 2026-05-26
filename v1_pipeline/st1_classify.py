@@ -8,20 +8,20 @@ st0 already filtered, but the two models disagree sometimes.
 
 from functools import lru_cache
 
-import torch
-from transformers import AutoModelForSequenceClassification, AutoTokenizer
-
 from . import config
 from ._inference import batches, pick_device
 
 
 @lru_cache(maxsize=1)
 def _load():
+    import torch
+    from transformers import AutoModelForSequenceClassification, AutoTokenizer
+
     device = pick_device(config.DEVICE)
     tokenizer = AutoTokenizer.from_pretrained(config.ST1_CKPT)
     model = AutoModelForSequenceClassification.from_pretrained(config.ST1_CKPT)
     model.eval().to(device)
-    return tokenizer, model, device
+    return tokenizer, model, device, torch
 
 
 def classify_relations(sentences: list[dict], batch_size: int | None = None) -> list[dict]:
@@ -37,7 +37,7 @@ def classify_relations(sentences: list[dict], batch_size: int | None = None) -> 
     """
     if not sentences:
         return []
-    tokenizer, model, device = _load()
+    tokenizer, model, device, torch = _load()
     bs = batch_size or config.ST1_BATCH
     id2label = model.config.id2label
 

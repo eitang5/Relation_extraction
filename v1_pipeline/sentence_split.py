@@ -7,12 +7,11 @@ article-global positions for entity-coref resolution.
 
 from functools import lru_cache
 
-import spacy
-from spacy.language import Language
-
 
 @lru_cache(maxsize=1)
-def _nlp() -> Language:
+def _nlp():
+    import spacy
+
     nlp = spacy.blank("en")
     nlp.add_pipe("sentencizer")
     return nlp

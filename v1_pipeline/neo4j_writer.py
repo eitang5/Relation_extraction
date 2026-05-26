@@ -48,7 +48,9 @@ def write_article_to_neo4j(article_graph: dict, storage: GraphStorage | None = N
                 event["id"],
                 label="Event",
                 name=event["name"],
+                canonical_key=event.get("canonical_key", ""),
                 article_id=event["article_id"],
+                article_ids=event.get("article_ids", [event["article_id"]]),
                 spans_json=json.dumps(event["spans"]),
                 sentence_indices=event["sentence_indices"],
             )
@@ -74,6 +76,9 @@ def write_article_to_neo4j(article_graph: dict, storage: GraphStorage | None = N
                 source_sentence=edge["source_sentence"],
                 sentence_idx=edge["sentence_idx"],
                 article_id=article_id,
+                st2_subject=edge.get("st2_subject", ""),
+                st2_object=edge.get("st2_object", ""),
+                st2_raw_relation=edge.get("st2_raw_relation", ""),
             )
             written["causal_edges"] += 1
 

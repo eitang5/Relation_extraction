@@ -6,6 +6,8 @@ import os
 ST0_CKPT = os.environ.get("ST0_CKPT", "eitang/st0")
 ST1_CKPT = os.environ.get("ST1_CKPT", "eitang/st1")
 ST2_CKPT = os.environ.get("ST2_CKPT", "eitang/st2")
+ST2_BACKEND = os.environ.get("ST2_BACKEND", "rebel")  # rebel | bio
+ST2_REBEL_CKPT = os.environ.get("ST2_REBEL_CKPT", "Babelscape/rebel-large")
 
 # Inference settings.
 DEVICE = os.environ.get("DEVICE", "auto")  # auto | cuda | mps | cpu
@@ -14,6 +16,8 @@ ST0_BATCH = int(os.environ.get("ST0_BATCH", 32))
 ST1_BATCH = int(os.environ.get("ST1_BATCH", 32))
 ST2_BATCH = int(os.environ.get("ST2_BATCH", 32))
 MAX_LEN = int(os.environ.get("MAX_LEN", 128))
+ST2_REBEL_MAX_LEN = int(os.environ.get("ST2_REBEL_MAX_LEN", 512))
+ST2_REBEL_MAX_NEW_TOKENS = int(os.environ.get("ST2_REBEL_MAX_NEW_TOKENS", 128))
 
 # Coref.
 COREF_MODEL = os.environ.get("COREF_MODEL", "lingmess")  # lingmess | fcoref

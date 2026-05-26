@@ -7,20 +7,20 @@ positive (causal) class.
 
 from functools import lru_cache
 
-import torch
-from transformers import AutoModelForSequenceClassification, AutoTokenizer
-
 from . import config
 from ._inference import batches, pick_device
 
 
 @lru_cache(maxsize=1)
 def _load():
+    import torch
+    from transformers import AutoModelForSequenceClassification, AutoTokenizer
+
     device = pick_device(config.DEVICE)
     tokenizer = AutoTokenizer.from_pretrained(config.ST0_CKPT)
     model = AutoModelForSequenceClassification.from_pretrained(config.ST0_CKPT)
     model.eval().to(device)
-    return tokenizer, model, device
+    return tokenizer, model, device, torch
 
 
 def filter_sentences(sentences: list[dict], batch_size: int | None = None) -> list[dict]:
@@ -31,7 +31,7 @@ def filter_sentences(sentences: list[dict], batch_size: int | None = None) -> li
     """
     if not sentences:
         return []
-    tokenizer, model, device = _load()
+    tokenizer, model, device, torch = _load()
     bs = batch_size or config.ST0_BATCH
 
     keep_mask: list[bool] = []

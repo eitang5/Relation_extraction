@@ -1,10 +1,10 @@
 """Shared inference helpers — device pick + a batching iterator."""
 
-import torch
-
 
 def pick_device(requested: str = "auto") -> str:
     """Resolve 'auto' to the best available device."""
+    import torch
+
     if requested == "cuda":
         return "cuda"
     if requested == "mps":
